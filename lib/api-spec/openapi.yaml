@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: QuantStock API — NSE/BSE stock scoring engine
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: stocks
+    description: Stock lookup, scoring, and history
+  - name: scoring-config
+    description: Scoring weight configuration
 paths:
   /healthz:
     get:
@@ -24,7 +28,167 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /stocks/search:
+    get:
+      operationId: searchStocks
+      tags: [stocks]
+      summary: Search for NSE/BSE tickers by name or symbol
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Matching tickers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockSearchResult"
+
+  /stocks/{ticker}:
+    get:
+      operationId: getStock
+      tags: [stocks]
+      summary: Get stock profile
+      parameters:
+        - $ref: "#/components/parameters/TickerParam"
+      responses:
+        "200":
+          description: Stock profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stock"
+        "404":
+          description: Ticker not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stocks/{ticker}/score:
+    get:
+      operationId: getStockScore
+      tags: [stocks]
+      summary: Get the cached/current score summary for a ticker
+      parameters:
+        - $ref: "#/components/parameters/TickerParam"
+      responses:
+        "200":
+          description: Score summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreSummary"
+        "404":
+          description: Ticker not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stocks/{ticker}/score/details:
+    get:
+      operationId: getStockScoreDetails
+      tags: [stocks]
+      summary: Get full category breakdown, raw metrics, and formulas for a ticker's score
+      parameters:
+        - $ref: "#/components/parameters/TickerParam"
+      responses:
+        "200":
+          description: Score details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreDetails"
+        "404":
+          description: Ticker not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stocks/{ticker}/history/{range}:
+    get:
+      operationId: getStockHistory
+      tags: [stocks]
+      summary: Get price history for charting
+      parameters:
+        - $ref: "#/components/parameters/TickerParam"
+        - name: range
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: ["1m", "6m", "1y", "5y"]
+      responses:
+        "200":
+          description: Price history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryResponse"
+        "404":
+          description: Ticker not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /scoring-config:
+    get:
+      operationId: listScoringConfigs
+      tags: [scoring-config]
+      summary: List all scoring configs (platform default + per-sector overrides)
+      responses:
+        "200":
+          description: Scoring configs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScoringConfig"
+    post:
+      operationId: upsertScoringConfig
+      tags: [scoring-config]
+      summary: Create or update the category weights for the platform default or a specific sector
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScoringConfigInput"
+      responses:
+        "200":
+          description: Updated scoring config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoringConfig"
+        "400":
+          description: Invalid weights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
+  parameters:
+    TickerParam:
+      name: ticker
+      in: path
+      required: true
+      description: NSE/BSE ticker, e.g. RELIANCE.NS or 500325.BO
+      schema:
+        type: string
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +198,312 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    StockSearchResult:
+      type: object
+      required: [ticker, companyName, exchange]
+      properties:
+        ticker:
+          type: string
+        companyName:
+          type: string
+        exchange:
+          type: string
+
+    Stock:
+      type: object
+      required:
+        [ticker, companyName, sector, industry, marketCap, currency, price, lastUpdated]
+      properties:
+        ticker:
+          type: string
+        companyName:
+          type: string
+        sector:
+          type: ["string", "null"]
+        industry:
+          type: ["string", "null"]
+        marketCap:
+          type: ["number", "null"]
+        currency:
+          type: string
+        price:
+          type: ["number", "null"]
+        changePercent:
+          type: ["number", "null"]
+        lastUpdated:
+          type: string
+          format: date-time
+
+    CategoryScores:
+      type: object
+      required:
+        [valuation, financialHealth, profitability, growth, risk, momentum]
+      properties:
+        valuation:
+          type: number
+        financialHealth:
+          type: number
+        profitability:
+          type: number
+        growth:
+          type: number
+        risk:
+          type: number
+        momentum:
+          type: number
+
+    Factor:
+      type: object
+      required: [factor, direction, weight]
+      properties:
+        factor:
+          type: string
+        direction:
+          type: string
+          enum: [positive, negative]
+        weight:
+          type: number
+
+    ScoreExplanation:
+      type: object
+      required: [reasons, risks]
+      properties:
+        reasons:
+          type: array
+          items:
+            type: string
+        risks:
+          type: array
+          items:
+            type: string
+
+    ScoreSummary:
+      type: object
+      required:
+        [
+          ticker,
+          overallScore,
+          recommendation,
+          confidence,
+          categoryScores,
+          topFactors,
+          riskFlags,
+          explanation,
+          computedAt,
+        ]
+      properties:
+        ticker:
+          type: string
+        overallScore:
+          type: number
+        recommendation:
+          type: string
+          enum: [strong_buy, buy, hold, reduce, sell, strong_short]
+        confidence:
+          type: number
+        fairValueEstimate:
+          type: ["number", "null"]
+        categoryScores:
+          $ref: "#/components/schemas/CategoryScores"
+        topFactors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Factor"
+        riskFlags:
+          type: array
+          items:
+            type: string
+        explanation:
+          $ref: "#/components/schemas/ScoreExplanation"
+        computedAt:
+          type: string
+          format: date-time
+
+    MetricDetail:
+      type: object
+      required: [key, label, value, score, higherIsBetter]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        value:
+          type: ["number", "null"]
+        sectorBenchmark:
+          type: ["number", "null"]
+        score:
+          type: number
+        higherIsBetter:
+          type: boolean
+
+    CategoryDetail:
+      type: object
+      required: [category, weight, score, metrics]
+      properties:
+        category:
+          type: string
+        weight:
+          type: number
+        score:
+          type: number
+        metrics:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricDetail"
+
+    DcfAssumptions:
+      type: object
+      required: [wacc, terminalGrowthRate, projectionYears]
+      properties:
+        wacc:
+          type: number
+        terminalGrowthRate:
+          type: number
+        projectionYears:
+          type: integer
+
+    ScoreDetails:
+      type: object
+      required:
+        [
+          ticker,
+          overallScore,
+          recommendation,
+          confidence,
+          categoryScores,
+          categories,
+          topFactors,
+          riskFlags,
+          explanation,
+          dcfAssumptions,
+          computedAt,
+        ]
+      properties:
+        ticker:
+          type: string
+        overallScore:
+          type: number
+        recommendation:
+          type: string
+          enum: [strong_buy, buy, hold, reduce, sell, strong_short]
+        confidence:
+          type: number
+        fairValueEstimate:
+          type: ["number", "null"]
+        categoryScores:
+          $ref: "#/components/schemas/CategoryScores"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryDetail"
+        topFactors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Factor"
+        riskFlags:
+          type: array
+          items:
+            type: string
+        explanation:
+          $ref: "#/components/schemas/ScoreExplanation"
+        dcfAssumptions:
+          $ref: "#/components/schemas/DcfAssumptions"
+        computedAt:
+          type: string
+          format: date-time
+
+    PricePoint:
+      type: object
+      required: [date, close, volume]
+      properties:
+        date:
+          type: string
+          format: date
+        close:
+          type: number
+        volume:
+          type: number
+
+    HistoryResponse:
+      type: object
+      required: [ticker, range, points]
+      properties:
+        ticker:
+          type: string
+        range:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/PricePoint"
+
+    ScoringConfigInput:
+      type: object
+      required:
+        [
+          sector,
+          valuationWeight,
+          financialHealthWeight,
+          profitabilityWeight,
+          growthWeight,
+          riskWeight,
+          momentumWeight,
+        ]
+      properties:
+        sector:
+          description: Sector name this override applies to, or null for the platform default
+          type: ["string", "null"]
+        valuationWeight:
+          type: number
+        financialHealthWeight:
+          type: number
+        profitabilityWeight:
+          type: number
+        growthWeight:
+          type: number
+        riskWeight:
+          type: number
+        momentumWeight:
+          type: number
+
+    ScoringConfig:
+      type: object
+      required:
+        [
+          id,
+          sector,
+          valuationWeight,
+          financialHealthWeight,
+          profitabilityWeight,
+          growthWeight,
+          riskWeight,
+          momentumWeight,
+          updatedAt,
+        ]
+      properties:
+        id:
+          type: integer
+        sector:
+          type: ["string", "null"]
+        valuationWeight:
+          type: number
+        financialHealthWeight:
+          type: number
+        profitabilityWeight:
+          type: number
+        growthWeight:
+          type: number
+        riskWeight:
+          type: number
+        momentumWeight:
+          type: number
+        updatedAt:
+          type: string
+          format: date-time

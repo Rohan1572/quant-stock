@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "QuantStock"
+version = "1.0.0"
+id = "artifacts/quantstock"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18911
+
+[services.development]
+run = "pnpm --filter @workspace/quantstock run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/quantstock", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/quantstock/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18911"
+BASE_PATH = "/"

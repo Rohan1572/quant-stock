@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { PriceChart } from "@/components/chart/PriceChart";
+import { PositionCard } from "@/components/PositionCard";
 
 function formatRecommendation(rec: string) {
   return rec.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
@@ -276,6 +277,18 @@ export default function StockScore() {
             </CardContent>
           </Card>
         </div>
+
+        {/* My Position */}
+        {!isLoading && stock?.price != null && score?.overallScore != null && (
+          <div className="mb-8">
+            <PositionCard
+              ticker={decodedTicker}
+              currentPrice={stock.price}
+              currency={stock.currency ?? "INR"}
+              score={score.overallScore}
+            />
+          </div>
+        )}
 
         {/* Category Breakdown & Chart */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">

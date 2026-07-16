@@ -1,9 +1,12 @@
 import { Link, useLocation } from "wouter";
-import { Activity, Settings, Trophy } from "lucide-react";
+import { Activity, Settings, Trophy, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useTheme } from "@/hooks/useTheme";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const { theme, toggle } = useTheme();
 
   return (
     <div className="min-h-screen flex flex-col w-full">
@@ -22,6 +25,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </div>
             
             <nav className="flex items-center space-x-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggle}
+                className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                aria-label="Toggle theme"
+              >
+                {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </Button>
               <Link href="/rankings"
                 className={cn(
                   "flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-md transition-colors",

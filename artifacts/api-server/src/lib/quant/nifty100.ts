@@ -32,7 +32,7 @@ export const WATCHLIST: WatchlistEntry[] = [
   { ticker: "HCLTECH.NS", companyName: "HCL Technologies", sector: "Technology" },
   { ticker: "WIPRO.NS", companyName: "Wipro", sector: "Technology" },
   { ticker: "TECHM.NS", companyName: "Tech Mahindra", sector: "Technology" },
-  { ticker: "LTIM.NS", companyName: "LTIMindtree", sector: "Technology" },
+  { ticker: "LTTS.NS", companyName: "L&T Technology Services", sector: "Technology" },
   { ticker: "PERSISTENT.NS", companyName: "Persistent Systems", sector: "Technology" },
   { ticker: "COFORGE.NS", companyName: "Coforge", sector: "Technology" },
   { ticker: "MPHASIS.NS", companyName: "Mphasis", sector: "Technology" },
@@ -58,7 +58,7 @@ export const WATCHLIST: WatchlistEntry[] = [
   { ticker: "GODREJCP.NS", companyName: "Godrej Consumer Products", sector: "Consumer Defensive" },
   // Consumer Cyclical / Auto
   { ticker: "MARUTI.NS", companyName: "Maruti Suzuki India", sector: "Consumer Cyclical" },
-  { ticker: "TATAMOTORS.NS", companyName: "Tata Motors", sector: "Consumer Cyclical" },
+  { ticker: "M&M.NS", companyName: "Mahindra & Mahindra", sector: "Consumer Cyclical" },
   { ticker: "BAJAJ-AUTO.NS", companyName: "Bajaj Auto", sector: "Consumer Cyclical" },
   { ticker: "HEROMOTOCO.NS", companyName: "Hero MotoCorp", sector: "Consumer Cyclical" },
   { ticker: "EICHERMOT.NS", companyName: "Eicher Motors", sector: "Consumer Cyclical" },
@@ -102,7 +102,7 @@ export const WATCHLIST: WatchlistEntry[] = [
   { ticker: "AMBUJACEM.NS", companyName: "Ambuja Cements", sector: "Basic Materials" },
   // Communication Services
   { ticker: "BHARTIARTL.NS", companyName: "Bharti Airtel", sector: "Communication Services" },
-  { ticker: "ZOMATO.NS", companyName: "Zomato", sector: "Communication Services" },
+  { ticker: "SWIGGY.NS", companyName: "Swiggy", sector: "Communication Services" },
   { ticker: "PAYTM.NS", companyName: "One 97 Communications (Paytm)", sector: "Communication Services" },
   // Real Estate
   { ticker: "DLF.NS", companyName: "DLF", sector: "Real Estate" },

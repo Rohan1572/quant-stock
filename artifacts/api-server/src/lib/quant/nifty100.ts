@@ -110,6 +110,10 @@ export const WATCHLIST: WatchlistEntry[] = [
   { ticker: "PRESTIGE.NS", companyName: "Prestige Estates", sector: "Real Estate" },
   { ticker: "OBEROIRLTY.NS", companyName: "Oberoi Realty", sector: "Real Estate" },
   // Conglomerates / Others
+  { ticker: "IRFC.NS", companyName: "Indian Railway Finance Corporation", sector: "Financial Services" },
+  { ticker: "JSWENERGY.NS", companyName: "JSW Energy", sector: "Utilities" },
+  { ticker: "MANKIND.NS", companyName: "Mankind Pharma", sector: "Healthcare" },
+  { ticker: "LODHA.NS", companyName: "Macrotech Developers (Lodha)", sector: "Real Estate" },
   { ticker: "TATACONSUM.NS", companyName: "Tata Consumer Products", sector: "Consumer Defensive" },
   { ticker: "TATACHEM.NS", companyName: "Tata Chemicals", sector: "Basic Materials" },
   { ticker: "VOLTAS.NS", companyName: "Voltas", sector: "Industrials" },

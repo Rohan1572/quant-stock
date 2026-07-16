@@ -91,6 +91,16 @@ export default function Rankings() {
   const { mutate: triggerRefresh, isPending: isTriggering } = useRefreshRankings();
 
   const [cooldownMsg, setCooldownMsg] = useState<string | null>(null);
+  const [autoTriggered, setAutoTriggered] = useState(false);
+
+  // Auto-start scoring on first load if no full refresh has ever completed
+  useEffect(() => {
+    if (isLoading || autoTriggered) return;
+    if (!data?.lastRefreshedAt && !data?.isRefreshing) {
+      setAutoTriggered(true);
+      triggerRefresh(undefined, { onSuccess: () => refetch() });
+    }
+  }, [isLoading, data?.lastRefreshedAt, data?.isRefreshing]);
 
   // Clear cooldown message once nextRefreshAt passes
   useEffect(() => {

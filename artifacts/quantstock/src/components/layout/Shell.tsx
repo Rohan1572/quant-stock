@@ -3,10 +3,12 @@ import { Activity, Settings, Trophy, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
+import { SearchCombobox } from "@/components/search/SearchCombobox";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { theme, toggle } = useTheme();
+  const showHeaderSearch = location !== "/";
 
   return (
     <div className="min-h-screen flex flex-col w-full">
@@ -20,8 +22,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </Link>
           
           <div className="flex-1 flex items-center justify-end md:justify-between space-x-2 md:space-x-4">
-            <div className="hidden md:flex flex-1 max-w-md">
-              {/* Optional: mini search bar in header when not on home page */}
+            <div className="hidden md:flex flex-1 max-w-sm">
+              {showHeaderSearch && <SearchCombobox compact className="w-full" />}
             </div>
             
             <nav className="flex items-center space-x-1">

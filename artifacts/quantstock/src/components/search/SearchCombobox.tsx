@@ -7,10 +7,12 @@ import { cn } from "@/lib/utils";
 
 export function SearchCombobox({ 
   className, 
-  autoFocus = false 
+  autoFocus = false,
+  compact = false,
 }: { 
   className?: string;
   autoFocus?: boolean;
+  compact?: boolean;
 }) {
   const [, setLocation] = useLocation();
   const [query, setQuery] = useState("");
@@ -56,33 +58,35 @@ export function SearchCombobox({
   };
 
   return (
-    <div ref={containerRef} className={cn("relative w-full max-w-2xl mx-auto", className)}>
+    <div ref={containerRef} className={cn("relative w-full", compact ? "max-w-xs" : "max-w-2xl mx-auto", className)}>
       <form onSubmit={onSubmit} className="relative">
         <div className="relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+          <Search className={cn("absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors", compact ? "w-3.5 h-3.5" : "w-5 h-5 left-4")} />
           <Input
             type="search"
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setIsOpen(true);
-            }}
+            onChange={(e) => { setQuery(e.target.value); setIsOpen(true); }}
             onFocus={() => setIsOpen(true)}
-            placeholder="Search tickers (e.g. RELIANCE, TCS, INFY)"
+            placeholder={compact ? "Search tickers…" : "Search tickers (e.g. RELIANCE, TCS, INFY)"}
             autoFocus={autoFocus}
-            className="pl-12 pr-12 h-14 text-lg bg-card border-2 border-input focus-visible:border-primary shadow-sm rounded-xl font-mono uppercase"
+            className={cn(
+              "bg-card border-input focus-visible:border-primary font-mono uppercase",
+              compact
+                ? "pl-8 pr-8 h-8 text-xs rounded-md border"
+                : "pl-12 pr-12 h-14 text-lg border-2 shadow-sm rounded-xl"
+            )}
             data-testid="input-ticker-search"
           />
           {isLoading && query === debouncedQuery && query.length > 0 && (
-            <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground animate-spin" />
+            <Loader2 className={cn("absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground animate-spin", compact ? "w-3 h-3" : "w-5 h-5 right-4")} />
           )}
           {!isLoading && query.length > 0 && (
-            <button 
+            <button
               type="submit"
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 bg-primary/10 text-primary rounded-md hover:bg-primary hover:text-primary-foreground transition-colors"
+              className={cn("absolute right-2 top-1/2 -translate-y-1/2 bg-primary/10 text-primary rounded hover:bg-primary hover:text-primary-foreground transition-colors", compact ? "p-0.5" : "p-1.5 right-3")}
               data-testid="button-search-submit"
             >
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className={compact ? "w-3 h-3" : "w-4 h-4"} />
             </button>
           )}
         </div>

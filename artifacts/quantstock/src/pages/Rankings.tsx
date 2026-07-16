@@ -9,6 +9,8 @@ import {
   Minus,
   ChevronRight,
   AlertCircle,
+  Search,
+  X,
 } from "lucide-react";
 import { useGetRankings, useRefreshRankings, getGetRankingsQueryKey } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
@@ -80,8 +82,18 @@ function RowSkeleton() {
   );
 }
 
+// ── All sectors from the watchlist ───────────────────────────────────────────
+const ALL_SECTORS = [
+  "Financial Services", "Technology", "Energy", "Utilities", "Industrials",
+  "Consumer Defensive", "Consumer Cyclical", "Healthcare", "Basic Materials",
+  "Communication Services", "Real Estate",
+];
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Rankings() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeSector, setActiveSector] = useState<string | null>(null);
+
   const { data, isLoading, refetch } = useGetRankings({
     query: {
       queryKey: getGetRankingsQueryKey(),
@@ -129,10 +141,21 @@ export default function Rankings() {
     });
   }
 
-  const items = data?.items ?? [];
-  const total = data?.total ?? 97;
+  const allItems = data?.items ?? [];
+  const total = data?.total ?? 100;
   const scored = data?.scored ?? 0;
   const progressPct = total > 0 ? Math.round((scored / total) * 100) : 0;
+
+  // Client-side filter
+  const q = searchQuery.trim().toLowerCase();
+  const items = allItems.filter((item) => {
+    const matchesSearch =
+      !q ||
+      item.ticker.toLowerCase().includes(q) ||
+      item.companyName.toLowerCase().includes(q);
+    const matchesSector = !activeSector || item.sector === activeSector;
+    return matchesSearch && matchesSector;
+  });
 
   return (
     <div className="flex-1 w-full bg-background">
@@ -178,6 +201,44 @@ export default function Rankings() {
             )}
           </div>
         </div>
+
+        {/* Search + sector filter */}
+        {!isLoading && allItems.length > 0 && (
+          <div className="mb-6 space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Filter by ticker or company…"
+                className="w-full h-9 pl-9 pr-9 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setActiveSector(null)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${!activeSector ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}
+              >
+                All sectors
+              </button>
+              {ALL_SECTORS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setActiveSector(activeSector === s ? null : s)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${activeSector === s ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Scoring progress banner */}
         {!isLoading && scored < total && (

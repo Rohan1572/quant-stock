@@ -181,6 +181,58 @@ export interface ScoringConfig {
   updatedAt: string;
 }
 
+export type RankingItemRecommendation = typeof RankingItemRecommendation[keyof typeof RankingItemRecommendation];
+
+
+export const RankingItemRecommendation = {
+  strong_buy: 'strong_buy',
+  buy: 'buy',
+  hold: 'hold',
+  reduce: 'reduce',
+  sell: 'sell',
+  strong_short: 'strong_short',
+} as const;
+
+export interface RankingItem {
+  rank: number;
+  ticker: string;
+  companyName: string;
+  /** @nullable */
+  sector: string | null;
+  overallScore: number;
+  recommendation: RankingItemRecommendation;
+  confidence: number;
+  computedAt: string;
+}
+
+export interface RankingsResponse {
+  items: RankingItem[];
+  /** Total tickers in the watchlist */
+  total: number;
+  /** How many have been scored so far */
+  scored: number;
+  isRefreshing: boolean;
+  /** @nullable */
+  lastRefreshedAt?: string | null;
+  /** @nullable */
+  nextRefreshAt?: string | null;
+}
+
+export type RefreshRankingsResultStatus = typeof RefreshRankingsResultStatus[keyof typeof RefreshRankingsResultStatus];
+
+
+export const RefreshRankingsResultStatus = {
+  started: 'started',
+  rate_limited: 'rate_limited',
+} as const;
+
+export interface RefreshRankingsResult {
+  status: RefreshRankingsResultStatus;
+  message: string;
+  /** @nullable */
+  nextRefreshAt?: string | null;
+}
+
 export type SearchStocksParams = {
 /**
  * @minLength 1

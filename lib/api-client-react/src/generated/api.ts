@@ -23,6 +23,8 @@ import type {
   ErrorResponse,
   HealthStatus,
   HistoryResponse,
+  RankingsResponse,
+  RefreshRankingsResult,
   ScoreDetails,
   ScoreSummary,
   ScoringConfig,
@@ -136,6 +138,154 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
+
+export const getGetRankingsUrl = () => {
+
+
+
+
+  return `/api/rankings`
+}
+
+/**
+ * @summary Get pre-computed top-stock rankings
+ */
+export const getRankings = async ( options?: RequestInit): Promise<RankingsResponse> => {
+
+  return customFetch<RankingsResponse>(getGetRankingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRankingsQueryKey = () => {
+    return [
+    `/api/rankings`
+    ] as const;
+    }
+
+
+export const getGetRankingsQueryOptions = <TData = Awaited<ReturnType<typeof getRankings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRankings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRankingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRankings>>> = ({ signal }) => getRankings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRankings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRankingsQueryResult = NonNullable<Awaited<ReturnType<typeof getRankings>>>
+export type GetRankingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get pre-computed top-stock rankings
+ */
+
+export function useGetRankings<TData = Awaited<ReturnType<typeof getRankings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRankings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRankingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRefreshRankingsUrl = () => {
+
+
+
+
+  return `/api/rankings/refresh`
+}
+
+/**
+ * @summary Trigger a background rescore of all watchlist tickers
+ */
+export const refreshRankings = async ( options?: RequestInit): Promise<RefreshRankingsResult> => {
+
+  return customFetch<RefreshRankingsResult>(getRefreshRankingsUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRefreshRankingsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshRankings>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof refreshRankings>>, TError,void, TContext> => {
+
+const mutationKey = ['refreshRankings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof refreshRankings>>, void> = () => {
+
+
+          return  refreshRankings(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RefreshRankingsMutationResult = NonNullable<Awaited<ReturnType<typeof refreshRankings>>>
+
+    export type RefreshRankingsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Trigger a background rescore of all watchlist tickers
+ */
+export const useRefreshRankings = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshRankings>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof refreshRankings>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRefreshRankingsMutationOptions(options));
+    }
 
 export const getSearchStocksUrl = (params: SearchStocksParams,) => {
   const normalizedParams = new URLSearchParams();

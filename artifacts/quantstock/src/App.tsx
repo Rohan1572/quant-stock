@@ -8,6 +8,7 @@ import { Shell } from '@/components/layout/Shell';
 import Home from '@/pages/Home';
 import StockScore from '@/pages/StockScore';
 import ScoringConfig from '@/pages/ScoringConfig';
+import Rankings from '@/pages/Rankings';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,6 +24,7 @@ function Router() {
     <Shell>
       <Switch>
         <Route path="/" component={Home} />
+        <Route path="/rankings" component={Rankings} />
         <Route path="/stocks/:ticker" component={StockScore} />
         <Route path="/scoring-config" component={ScoringConfig} />
         <Route component={NotFound} />

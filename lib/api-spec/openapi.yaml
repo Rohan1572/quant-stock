@@ -14,6 +14,8 @@ tags:
     description: Stock lookup, scoring, and history
   - name: scoring-config
     description: Scoring weight configuration
+  - name: rankings
+    description: Pre-computed top-stock rankings
 paths:
   /healthz:
     get:
@@ -28,6 +30,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /rankings:
+    get:
+      operationId: getRankings
+      tags: [rankings]
+      summary: Get pre-computed top-stock rankings
+      responses:
+        "200":
+          description: Ranked list sorted by overall score descending
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RankingsResponse"
+
+  /rankings/refresh:
+    post:
+      operationId: refreshRankings
+      tags: [rankings]
+      summary: Trigger a background rescore of all watchlist tickers
+      responses:
+        "200":
+          description: Refresh status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshRankingsResult"
 
   /stocks/search:
     get:
@@ -506,4 +534,63 @@ components:
           type: number
         updatedAt:
           type: string
+          format: date-time
+
+    RankingItem:
+      type: object
+      required: [rank, ticker, companyName, sector, overallScore, recommendation, confidence, computedAt]
+      properties:
+        rank:
+          type: integer
+        ticker:
+          type: string
+        companyName:
+          type: string
+        sector:
+          type: ["string", "null"]
+        overallScore:
+          type: number
+        recommendation:
+          type: string
+          enum: [strong_buy, buy, hold, reduce, sell, strong_short]
+        confidence:
+          type: number
+        computedAt:
+          type: string
+          format: date-time
+
+    RankingsResponse:
+      type: object
+      required: [items, total, scored, isRefreshing]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RankingItem"
+        total:
+          type: integer
+          description: Total tickers in the watchlist
+        scored:
+          type: integer
+          description: How many have been scored so far
+        isRefreshing:
+          type: boolean
+        lastRefreshedAt:
+          type: ["string", "null"]
+          format: date-time
+        nextRefreshAt:
+          type: ["string", "null"]
+          format: date-time
+
+    RefreshRankingsResult:
+      type: object
+      required: [status, message]
+      properties:
+        status:
+          type: string
+          enum: [started, rate_limited]
+        message:
+          type: string
+        nextRefreshAt:
+          type: ["string", "null"]
           format: date-time

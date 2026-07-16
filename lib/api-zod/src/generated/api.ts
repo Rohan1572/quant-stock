@@ -18,6 +18,38 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Get pre-computed top-stock rankings
+ */
+export const GetRankingsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "rank": zod.number(),
+  "ticker": zod.string(),
+  "companyName": zod.string(),
+  "sector": zod.string().nullable(),
+  "overallScore": zod.number(),
+  "recommendation": zod.enum(['strong_buy', 'buy', 'hold', 'reduce', 'sell', 'strong_short']),
+  "confidence": zod.number(),
+  "computedAt": zod.coerce.date()
+})),
+  "total": zod.number().describe('Total tickers in the watchlist'),
+  "scored": zod.number().describe('How many have been scored so far'),
+  "isRefreshing": zod.boolean(),
+  "lastRefreshedAt": zod.coerce.date().nullish(),
+  "nextRefreshAt": zod.coerce.date().nullish()
+})
+
+
+/**
+ * @summary Trigger a background rescore of all watchlist tickers
+ */
+export const RefreshRankingsResponse = zod.object({
+  "status": zod.enum(['started', 'rate_limited']),
+  "message": zod.string(),
+  "nextRefreshAt": zod.coerce.date().nullish()
+})
+
+
+/**
  * @summary Search for NSE/BSE tickers by name or symbol
  */
 

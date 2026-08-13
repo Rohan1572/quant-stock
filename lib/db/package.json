@@ -8,8 +8,9 @@
     "./schema": "./src/schema/index.ts"
   },
   "scripts": {
-    "push": "drizzle-kit push --config ./drizzle.config.ts",
-    "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
+    "migrate": "node-pg-migrate -j ts up",
+    "migrate:down": "node-pg-migrate -j ts down",
+    "migrate:create": "node-pg-migrate -j ts create"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
@@ -20,6 +21,6 @@
   "devDependencies": {
     "@types/node": "25.9.5",
     "@types/pg": "8.20.0",
-    "drizzle-kit": "0.31.10"
+    "node-pg-migrate": "9.0.0"
   }
 }

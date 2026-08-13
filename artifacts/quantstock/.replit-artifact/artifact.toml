@@ -11,10 +11,10 @@ paths = [ "/" ]
 localPort = 18911
 
 [services.development]
-run = "pnpm --filter @workspace/quantstock run dev"
+run = "npm run dev --workspace=@workspace/quantstock"
 
 [services.production]
-build = [ "pnpm", "--filter", "@workspace/quantstock", "run", "build" ]
+build = [ "npm", "run", "build", "--workspace=@workspace/quantstock" ]
 serve = "static"
 publicDir = "artifacts/quantstock/dist/public"
 

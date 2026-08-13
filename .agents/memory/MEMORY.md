@@ -1,2 +1,0 @@
-- [Orval path+query param collision](orval-path-query-collision.md) — mixing a path param with a query param on one operation causes a TS2308 duplicate-export after codegen.
-- [Yahoo Finance unofficial API auth](yahoo-finance-crumb-auth.md) — quoteSummary/fundamentals endpoints now require a cookie+crumb handshake; chart/search do not.

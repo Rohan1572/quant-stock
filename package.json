@@ -5,6 +5,7 @@
   "scripts": {
     "build": "npm run typecheck && npm run build:all",
     "build:all": "npm run --workspace=@workspace/api-server build && npm run --workspace=@workspace/quantstock build && npm run --workspace=@workspace/mockup-sandbox build",
+    "reinstall": "node -e \"const fs=require('fs');for(const p of ['node_modules','package-lock.json','.package-lock.json'])fs.rmSync(p,{recursive:true,force:true});\" && npm cache clean --force && npm i",
     "typecheck:libs": "tsc --build",
     "typecheck": "npm run typecheck:libs && npm run typecheck:all",
     "typecheck:all": "npm run --workspace=@workspace/api-server typecheck && npm run --workspace=@workspace/quantstock typecheck && npm run --workspace=@workspace/mockup-sandbox typecheck"
@@ -20,15 +21,13 @@
   },
   "devDependencies": {
     "prettier": "3.9.5",
-    "typescript": "~5.9.3"
+    "typescript": "5.9.3"
   },
   "allowScripts": {
-    "esbuild@0.28.2": true,
-    "esbuild@0.25.12": true,
-    "esbuild@0.18.20": true,
+    "@hookform/resolvers@3.10.0": true,
+    "esbuild": true,
     "react-hook-form@7.85.0": true,
-    "recharts@2.15.4": true,
-    "tailwindcss-animate@1.0.7": true,
-    "@hookform/resolvers@3.10.0": true
+    "recharts@3.10.1": true,
+    "tailwindcss-animate@1.0.7": true
   }
 }

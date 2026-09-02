@@ -17,10 +17,14 @@
   ],
   "private": true,
   "dependencies": {
-    "@replit/connectors-sdk": "0.4.1"
+    "@floating-ui/react-dom": "2.1.9",
+    "@replit/connectors-sdk": "0.4.1",
+    "regexparam": "3.0.0"
   },
   "devDependencies": {
+    "lightningcss": "1.33.0",
     "prettier": "3.9.5",
+    "tapable": "2.3.3",
     "typescript": "5.9.3"
   },
   "allowScripts": {

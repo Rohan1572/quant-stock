@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { useParams, Link } from "wouter";
-import { 
-  ArrowLeft, 
-  TrendingUp, 
-  TrendingDown, 
-  ShieldAlert, 
+import {
+  ArrowLeft,
+  TrendingUp,
+  TrendingDown,
+  ShieldAlert,
   Info,
   ChevronDown,
   ChevronUp,
@@ -12,9 +12,9 @@ import {
   CheckCircle2,
   AlertTriangle
 } from "lucide-react";
-import { 
-  useGetStock, 
-  useGetStockScore, 
+import {
+  useGetStock,
+  useGetStockScore,
   useGetStockScoreDetails,
   getGetStockScoreDetailsQueryKey
 } from "@workspace/api-client-react";
@@ -26,8 +26,13 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { PriceChart } from "@/components/chart/PriceChart";
 import { PositionCard } from "@/components/PositionCard";
+
+const PriceChart = lazy(() =>
+  import("@/components/chart/PriceChart").then((module) => ({
+    default: module.PriceChart,
+  }))
+);
 
 function formatRecommendation(rec: string) {
   return rec.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
@@ -48,7 +53,7 @@ function getRecommendationColor(rec: string) {
 export default function StockScore() {
   const { ticker } = useParams<{ ticker: string }>();
   const decodedTicker = decodeURIComponent(ticker).toUpperCase();
-  
+
   const [chartRange, setChartRange] = useState<'1m' | '6m' | '1y' | '5y'>('1y');
   const [showDetails, setShowDetails] = useState(false);
 
@@ -77,7 +82,7 @@ export default function StockScore() {
   return (
     <div className="flex-1 w-full bg-background">
       <div className="container max-w-5xl mx-auto py-8 px-4">
-        
+
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
           <div className="space-y-1">
@@ -137,7 +142,7 @@ export default function StockScore() {
 
         {/* Main Score Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          
+
           {/* Top Level Recommendation */}
           <Card className="lg:col-span-1 bg-card border-2 shadow-sm overflow-hidden flex flex-col">
             <div className="h-2 w-full bg-gradient-to-r from-primary to-blue-500" />
@@ -156,15 +161,15 @@ export default function StockScore() {
                   <div className="relative inline-flex items-center justify-center mb-6">
                     <svg className="w-36 h-36 transform -rotate-90">
                       <circle cx="72" cy="72" r="60" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-muted/30" />
-                      <circle 
-                        cx="72" cy="72" r="60" 
-                        stroke="currentColor" 
-                        strokeWidth="8" 
-                        fill="transparent" 
-                        strokeDasharray={377} 
+                      <circle
+                        cx="72" cy="72" r="60"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        fill="transparent"
+                        strokeDasharray={377}
                         strokeDashoffset={377 - (377 * (score?.overallScore || 0)) / 100}
-                        className={getRecommendationColor(score?.recommendation || 'hold')} 
-                        strokeLinecap="round" 
+                        className={getRecommendationColor(score?.recommendation || 'hold')}
+                        strokeLinecap="round"
                       />
                     </svg>
                     <div className="absolute flex flex-col items-center justify-center">
@@ -174,14 +179,14 @@ export default function StockScore() {
                       <span className="text-xs font-medium text-muted-foreground uppercase mt-1">/ 100</span>
                     </div>
                   </div>
-                  
-                  <Badge 
-                    variant={getRecommendationVariant(score?.recommendation || 'hold')} 
+
+                  <Badge
+                    variant={getRecommendationVariant(score?.recommendation || 'hold')}
                     className="text-lg px-4 py-1.5 font-bold uppercase tracking-widest shadow-sm"
                   >
                     {formatRecommendation(score?.recommendation || 'hold')}
                   </Badge>
-                  
+
                   <div className="flex items-center gap-1 mt-4 text-sm font-medium text-muted-foreground bg-secondary/50 px-3 py-1 rounded-full">
                     <Activity className="w-4 h-4" />
                     Confidence: {Math.round(score?.confidence || 0)}%
@@ -248,7 +253,7 @@ export default function StockScore() {
                         )}
                       </ul>
                     </div>
-                    
+
                     <div>
                       <h4 className="text-sm font-bold uppercase tracking-wider text-sell flex items-center mb-3">
                         <AlertTriangle className="w-4 h-4 mr-1.5" /> Risk Factors
@@ -300,7 +305,7 @@ export default function StockScore() {
             <CardContent>
               {isLoading ? (
                 <div className="space-y-4">
-                  {[1,2,3,4,5,6].map(i => (
+                  {[1, 2, 3, 4, 5, 6].map(i => (
                     <div key={i}>
                       <div className="flex justify-between mb-1">
                         <Skeleton className="h-4 w-24" />
@@ -341,9 +346,9 @@ export default function StockScore() {
               <div>
                 <CardTitle>Price History</CardTitle>
               </div>
-              <Tabs 
-                value={chartRange} 
-                onValueChange={(v) => setChartRange(v as any)} 
+              <Tabs
+                value={chartRange}
+                onValueChange={(v) => setChartRange(v as any)}
                 className="w-auto"
               >
                 <TabsList className="grid w-full grid-cols-4 h-8">
@@ -355,15 +360,23 @@ export default function StockScore() {
               </Tabs>
             </CardHeader>
             <CardContent className="pt-6">
-              <PriceChart ticker={decodedTicker} range={chartRange} />
+              <Suspense
+                fallback={
+                  <div className="w-full h-[300px] rounded-xl border bg-muted/20 p-4">
+                    <Skeleton className="h-full w-full" />
+                  </div>
+                }
+              >
+                <PriceChart ticker={decodedTicker} range={chartRange} />
+              </Suspense>
             </CardContent>
           </Card>
         </div>
 
         {/* Drill Down Details */}
         <div className="mb-12">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="w-full py-6 text-base font-medium shadow-sm hover:bg-secondary/50 border-dashed"
             onClick={() => setShowDetails(!showDetails)}
             data-testid="button-toggle-details"
@@ -386,7 +399,7 @@ export default function StockScore() {
                 </Card>
               ) : details ? (
                 <div className="space-y-6">
-                  
+
                   {/* DCF Assumptions */}
                   <Card className="bg-secondary/20 border-primary/20">
                     <CardHeader className="pb-3">
@@ -449,10 +462,9 @@ export default function StockScore() {
                                   </div>
                                   <div className="text-right w-16">
                                     <div className="text-xs text-muted-foreground uppercase mb-0.5 tracking-wider">Score</div>
-                                    <div className={`font-mono text-sm font-bold ${
-                                      metric.score >= 70 ? 'text-buy' : 
-                                      metric.score <= 40 ? 'text-sell' : 'text-hold'
-                                    }`}>
+                                    <div className={`font-mono text-sm font-bold ${metric.score >= 70 ? 'text-buy' :
+                                        metric.score <= 40 ? 'text-sell' : 'text-hold'
+                                      }`}>
                                       {Math.round(metric.score)}
                                     </div>
                                   </div>

@@ -3,12 +3,16 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "build": "npm run typecheck && npm run build:all",
-    "build:all": "npm run --workspace=@workspace/api-server build && npm run --workspace=@workspace/quantstock build && npm run --workspace=@workspace/mockup-sandbox build",
+    "dev": "npm run --workspace=@workspace/quantstock dev",
+    "dev:api": "npm run --workspace=@workspace/api-server dev",
+    "dev:mockup": "npm run --workspace=@workspace/mockup-sandbox dev",
+    "build": "npm run typecheck && npm run build:apps",
+    "build:apps": "npm run --workspaces --if-present build",
+    "codegen": "npm run --workspace=@workspace/api-spec codegen",
     "reinstall": "node -e \"const fs=require('fs');for(const p of ['node_modules','package-lock.json','.package-lock.json'])fs.rmSync(p,{recursive:true,force:true});\" && npm cache clean --force && npm i",
     "typecheck:libs": "tsc --build",
-    "typecheck": "npm run typecheck:libs && npm run typecheck:all",
-    "typecheck:all": "npm run --workspace=@workspace/api-server typecheck && npm run --workspace=@workspace/quantstock typecheck && npm run --workspace=@workspace/mockup-sandbox typecheck"
+    "typecheck": "npm run typecheck:libs && npm run typecheck:apps",
+    "typecheck:apps": "npm run --workspaces --if-present typecheck"
   },
   "workspaces": [
     "artifacts/*",

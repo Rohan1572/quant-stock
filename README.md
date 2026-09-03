@@ -55,7 +55,7 @@ The API server listens on `http://localhost:5000`. The frontend development serv
 ```powershell
 $env:PORT="3000"
 $env:BASE_PATH="/"
-npm run --workspace=@workspace/quantstock dev
+npm run dev
 ```
 
 Open `http://localhost:3000`.
@@ -64,7 +64,7 @@ Open `http://localhost:3000`.
 
 ```powershell
 $env:PORT="3001"
-npm run --workspace=@workspace/mockup-sandbox dev
+npm run dev:mockup
 ```
 
 Open `http://localhost:3001`.
@@ -74,7 +74,7 @@ Open `http://localhost:3001`.
 If the OpenAPI contract changes, regenerate the client and schema code:
 
 ```powershell
-npm run --workspace=@workspace/api-spec codegen
+npm run codegen
 ```
 
 ## 6. Typecheck and build

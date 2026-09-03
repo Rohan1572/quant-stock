@@ -44,8 +44,7 @@ npm run --workspace=@workspace/db migrate
 Start the API server first in a separate PowerShell terminal. Set the variables from step 2, then run:
 
 ```powershell
-npm run --workspace=@workspace/api-server build
-npm run --workspace=@workspace/api-server start
+npm run dev:api
 ```
 
 The API server listens on `http://localhost:5000`. The frontend development server proxies `/api` requests to it.

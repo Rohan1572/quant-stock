@@ -118,14 +118,25 @@ npm run build
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs typecheck, tests, lint, format check and build on
-every push to `main` and on every pull request, so the checks above are enforced
-rather than left to habit. It needs no database — the scoring engine's tests run
-on fixtures.
+`.github/workflows/ci.yml` runs the dependency audit, typecheck, tests, lint,
+format check and build on every push to `main` and on every pull request, so the
+checks above are enforced rather than left to habit. A second job applies the
+migrations up, down and up again against a real Postgres.
 
 Changes that touch the API contract must run `npm run codegen` and commit the
-generated output; CI runs `npm ci`, which fails if `package.json` and
-`package-lock.json` have drifted apart.
+generated output.
+
+### Dependency updates
+
+`package-lock.json` is intentionally not tracked. Dependencies are reviewed and
+bumped deliberately — typically once a week, or in response to an advisory —
+rather than drifting in from upstream between commits.
+
+The trade-off is that CI resolves the current tree on every run instead of a
+pinned one, so a new transitive release can break a build that passed an hour
+earlier. That is the accepted cost of reviewing upgrades in one place instead of
+reviewing them in a diff nobody reads. If a build fails right after a green run,
+check whether an upstream package moved before suspecting the code.
 
 ## Project structure
 

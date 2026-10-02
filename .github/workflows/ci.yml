@@ -22,7 +22,11 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm ci
+        # npm install, not npm ci: package-lock.json is deliberately untracked so
+        # dependencies are reviewed and bumped deliberately rather than drifting
+        # in from upstream. That means CI resolves the current tree each run
+        # instead of a committed one.
+        run: npm install
 
       # Every workspace must declare what it imports; transitive resolution
       # works until an unrelated package changes its tree.
@@ -71,7 +75,7 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm ci
+        run: npm install
 
       - name: Migrate up
         run: npm run --workspace=@workspace/db migrate

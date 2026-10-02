@@ -77,9 +77,20 @@ router.get("/rankings", async (_req, res): Promise<void> => {
           .where(inArray(scoreResultsTable.ticker, allTickers))
       : [];
 
-  // Sort by score descending, assign rank
-  const sorted = rows
-    .sort((a, b) => b.overallScore - a.overallScore)
+  // Rank on the confidence-adjusted score: ranking on the raw score favours
+  // thinly-covered stocks. Ties break on confidence then ticker for a stable
+  // ordering across refreshes.
+  const sorted = [...rows]
+    .sort((a, b) => {
+      const adjustedDelta =
+        (b.adjustedScore ?? b.overallScore) -
+        (a.adjustedScore ?? a.overallScore);
+      if (Math.abs(adjustedDelta) > 1e-9) return adjustedDelta;
+      if (Math.abs(b.confidence - a.confidence) > 1e-9) {
+        return b.confidence - a.confidence;
+      }
+      return a.ticker.localeCompare(b.ticker);
+    })
     .map((row, idx) => {
       const meta = getWatchlistEntry(row.ticker);
       return {
@@ -90,6 +101,14 @@ router.get("/rankings", async (_req, res): Promise<void> => {
         overallScore: row.overallScore,
         recommendation: row.recommendation,
         confidence: row.confidence,
+        confidenceLevel: row.confidenceLevel,
+        scoreRange: (row.scoreRange as {
+          low: number;
+          high: number;
+        } | null) ?? {
+          low: row.overallScore,
+          high: row.overallScore,
+        },
         computedAt: row.computedAt.toISOString(),
       };
     });

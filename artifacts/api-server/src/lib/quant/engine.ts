@@ -8,7 +8,13 @@ import {
   recommendationFromScore,
   estimateFairValue,
   getDcfAssumptions,
+  confidenceLevel,
+  shrinkToConfidence,
+  round,
   type CategoryWeights,
+  type ConfidenceBreakdown,
+  type ConfidenceLevel,
+  type ScoreRange,
 } from "./scoring";
 import { buildExplanation, buildTopFactors, buildRiskFlags } from "./explain";
 
@@ -23,10 +29,8 @@ const DEFAULT_WEIGHTS: CategoryWeights = {
   momentumWeight: 0.1,
 };
 
-// Scores are recomputed at most once per this window per ticker; within the
-// window the cached row in score_results is served. This is deliberately
-// short since the product decision is "on-demand" scoring, not a nightly
-// batch job — the cache only exists to absorb rapid repeat lookups.
+// Within this window the cached row is served. Short, because scoring is
+// on-demand; the cache only absorbs rapid repeat lookups.
 const SCORE_CACHE_TTL_MS = 15 * 60 * 1000;
 
 async function getWeightsForSector(
@@ -72,6 +76,16 @@ export interface ComputedScore {
   overallScore: number;
   recommendation: ReturnType<typeof recommendationFromScore>;
   confidence: number;
+  /** Qualitative read on the confidence number. */
+  confidenceLevel: ConfidenceLevel;
+  /** Per-component drivers behind `confidence`. */
+  confidenceBreakdown: ConfidenceBreakdown;
+  /** 95% interval around `overallScore`. */
+  scoreRange: ScoreRange;
+  /** Shrunk toward neutral for uncertainty; drives the recommendation. */
+  adjustedScore: number;
+  /** Importance-weighted share of the model that had usable data, 0-1. */
+  dataCoverage: number;
   fairValueEstimate: number | null;
   categoryScores: ReturnType<typeof computeCategories>["categoryScores"];
   categories: ReturnType<typeof computeCategories>["categories"];
@@ -97,13 +111,20 @@ async function computeFreshScore(ticker: string): Promise<ComputedScore> {
   const snapshot = fin ?? EMPTY_SNAPSHOT;
 
   const weights = await getWeightsForSector(profile.sector);
-  const { categories, categoryScores, overallScore } = computeCategories(
-    profile,
+  const { categories, categoryScores, overallScore, scoreRange, coverage } =
+    computeCategories(profile, snapshot, weights, priceHistory);
+
+  const { score: confidence, breakdown } = computeConfidence(
     snapshot,
-    weights,
+    priceHistory,
+    categories,
+    profile.sector,
   );
-  const recommendation = recommendationFromScore(overallScore);
-  const confidence = computeConfidence(snapshot, priceHistory);
+
+  // Shrink before mapping to a recommendation, so a high score on thin
+  // evidence cannot produce a confident buy call.
+  const adjustedScore = round(shrinkToConfidence(overallScore, confidence), 1);
+  const recommendation = recommendationFromScore(adjustedScore);
   const fairValueEstimate = estimateFairValue(snapshot, snapshot.revenueGrowth);
   const explanation = buildExplanation(
     profile,
@@ -116,16 +137,24 @@ async function computeFreshScore(ticker: string): Promise<ComputedScore> {
 
   return {
     ticker,
-    overallScore,
+    overallScore: round(overallScore, 1),
     recommendation,
     confidence,
+    confidenceLevel: confidenceLevel(confidence),
+    confidenceBreakdown: breakdown,
+    scoreRange: {
+      low: round(scoreRange.low, 1),
+      high: round(scoreRange.high, 1),
+    },
+    adjustedScore,
+    dataCoverage: round(coverage, 3),
     fairValueEstimate,
     categoryScores,
     categories,
     topFactors,
     riskFlags,
     explanation,
-    dcfAssumptions: getDcfAssumptions(),
+    dcfAssumptions: getDcfAssumptions(snapshot, snapshot.revenueGrowth),
     computedAt: new Date(),
   };
 }
@@ -170,10 +199,7 @@ export async function getScore(ticker: string): Promise<ComputedScore> {
     .where(eq(scoreResultsTable.ticker, normalized))
     .limit(1);
 
-  if (
-    cached &&
-    Date.now() - cached.computedAt.getTime() < SCORE_CACHE_TTL_MS
-  ) {
+  if (cached && Date.now() - cached.computedAt.getTime() < SCORE_CACHE_TTL_MS) {
     return rowToComputedScore(cached);
   }
 
@@ -200,6 +226,11 @@ export async function getScore(ticker: string): Promise<ComputedScore> {
       overallScore: fresh.overallScore,
       recommendation: fresh.recommendation,
       confidence: fresh.confidence,
+      confidenceLevel: fresh.confidenceLevel,
+      confidenceBreakdown: fresh.confidenceBreakdown,
+      scoreRange: fresh.scoreRange,
+      adjustedScore: fresh.adjustedScore,
+      dataCoverage: fresh.dataCoverage,
       fairValueEstimate: fresh.fairValueEstimate,
       categoryScores: fresh.categoryScores,
       categories: fresh.categories,
@@ -215,6 +246,11 @@ export async function getScore(ticker: string): Promise<ComputedScore> {
         overallScore: fresh.overallScore,
         recommendation: fresh.recommendation,
         confidence: fresh.confidence,
+        confidenceLevel: fresh.confidenceLevel,
+        confidenceBreakdown: fresh.confidenceBreakdown,
+        scoreRange: fresh.scoreRange,
+        adjustedScore: fresh.adjustedScore,
+        dataCoverage: fresh.dataCoverage,
         fairValueEstimate: fresh.fairValueEstimate,
         categoryScores: fresh.categoryScores,
         categories: fresh.categories,
@@ -233,6 +269,11 @@ function rowToComputedScore(row: {
   overallScore: number;
   recommendation: string;
   confidence: number;
+  confidenceLevel: string | null;
+  confidenceBreakdown: unknown;
+  scoreRange: unknown;
+  adjustedScore: number | null;
+  dataCoverage: number | null;
   fairValueEstimate: number | null;
   categoryScores: unknown;
   categories: unknown;
@@ -242,11 +283,21 @@ function rowToComputedScore(row: {
   dcfAssumptions: unknown;
   computedAt: Date;
 }): ComputedScore {
+  // Rows predating the score-range columns fall back to a degenerate band at the
+  // score so old cached rows still render.
+  const range = row.scoreRange as ScoreRange | null;
   return {
     ticker: row.ticker,
     overallScore: row.overallScore,
     recommendation: row.recommendation as ComputedScore["recommendation"],
     confidence: row.confidence,
+    confidenceLevel: (row.confidenceLevel ??
+      "moderate") as ComputedScore["confidenceLevel"],
+    confidenceBreakdown:
+      (row.confidenceBreakdown as ConfidenceBreakdown) ?? EMPTY_BREAKDOWN,
+    scoreRange: range ?? { low: row.overallScore, high: row.overallScore },
+    adjustedScore: row.adjustedScore ?? row.overallScore,
+    dataCoverage: row.dataCoverage ?? 0,
     fairValueEstimate: row.fairValueEstimate,
     categoryScores: row.categoryScores as ComputedScore["categoryScores"],
     categories: row.categories as ComputedScore["categories"],
@@ -257,6 +308,14 @@ function rowToComputedScore(row: {
     computedAt: row.computedAt,
   };
 }
+
+const EMPTY_BREAKDOWN: ConfidenceBreakdown = {
+  dataCoverage: 0,
+  metricDiversity: 0,
+  dataQuality: 0,
+  benchmarkQuality: 0,
+  historyQuality: 0,
+};
 
 export async function getProfile(ticker: string) {
   return provider.getProfile(ticker.toUpperCase());

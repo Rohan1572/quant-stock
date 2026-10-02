@@ -46,7 +46,10 @@ router.get("/stocks/:ticker", async (req, res): Promise<void> => {
   }
 
   res.json(
-    GetStockResponse.parse({ ...profile, lastUpdated: new Date().toISOString() }),
+    GetStockResponse.parse({
+      ...profile,
+      lastUpdated: new Date().toISOString(),
+    }),
   );
 });
 
@@ -65,6 +68,11 @@ router.get("/stocks/:ticker/score", async (req, res): Promise<void> => {
         overallScore: score.overallScore,
         recommendation: score.recommendation,
         confidence: score.confidence,
+        confidenceLevel: score.confidenceLevel,
+        confidenceBreakdown: score.confidenceBreakdown,
+        scoreRange: score.scoreRange,
+        adjustedScore: score.adjustedScore,
+        dataCoverage: score.dataCoverage,
         fairValueEstimate: score.fairValueEstimate,
         categoryScores: score.categoryScores,
         topFactors: score.topFactors,
@@ -82,42 +90,44 @@ router.get("/stocks/:ticker/score", async (req, res): Promise<void> => {
   }
 });
 
-router.get(
-  "/stocks/:ticker/score/details",
-  async (req, res): Promise<void> => {
-    const params = GetStockScoreDetailsParams.safeParse(req.params);
-    if (!params.success) {
-      res.status(400).json({ error: params.error.message });
+router.get("/stocks/:ticker/score/details", async (req, res): Promise<void> => {
+  const params = GetStockScoreDetailsParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  try {
+    const score = await getScore(params.data.ticker);
+    res.json(
+      GetStockScoreDetailsResponse.parse({
+        ticker: score.ticker,
+        overallScore: score.overallScore,
+        recommendation: score.recommendation,
+        confidence: score.confidence,
+        confidenceLevel: score.confidenceLevel,
+        confidenceBreakdown: score.confidenceBreakdown,
+        scoreRange: score.scoreRange,
+        adjustedScore: score.adjustedScore,
+        dataCoverage: score.dataCoverage,
+        fairValueEstimate: score.fairValueEstimate,
+        categoryScores: score.categoryScores,
+        categories: score.categories,
+        topFactors: score.topFactors,
+        riskFlags: score.riskFlags,
+        explanation: score.explanation,
+        dcfAssumptions: score.dcfAssumptions,
+        computedAt: score.computedAt.toISOString(),
+      }),
+    );
+  } catch (err) {
+    if (err instanceof TickerNotFoundError) {
+      res.status(404).json({ error: err.message });
       return;
     }
-
-    try {
-      const score = await getScore(params.data.ticker);
-      res.json(
-        GetStockScoreDetailsResponse.parse({
-          ticker: score.ticker,
-          overallScore: score.overallScore,
-          recommendation: score.recommendation,
-          confidence: score.confidence,
-          fairValueEstimate: score.fairValueEstimate,
-          categoryScores: score.categoryScores,
-          categories: score.categories,
-          topFactors: score.topFactors,
-          riskFlags: score.riskFlags,
-          explanation: score.explanation,
-          dcfAssumptions: score.dcfAssumptions,
-          computedAt: score.computedAt.toISOString(),
-        }),
-      );
-    } catch (err) {
-      if (err instanceof TickerNotFoundError) {
-        res.status(404).json({ error: err.message });
-        return;
-      }
-      throw err;
-    }
-  },
-);
+    throw err;
+  }
+});
 
 router.get(
   "/stocks/:ticker/history/:range",

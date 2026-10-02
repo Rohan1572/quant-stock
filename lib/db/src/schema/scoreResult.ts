@@ -1,4 +1,12 @@
-import { pgTable, serial, text, real, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  serial,
+  text,
+  real,
+  timestamp,
+  jsonb,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -16,6 +24,16 @@ export const scoreResultsTable = pgTable(
     overallScore: real("overall_score").notNull(),
     recommendation: text("recommendation").notNull(),
     confidence: real("confidence").notNull(),
+    // "low" | "moderate" | "high"
+    confidenceLevel: text("confidence_level"),
+    // Per-component drivers behind `confidence`, making it explainable.
+    confidenceBreakdown: jsonb("confidence_breakdown"),
+    // { low, high } 95% interval around overall_score.
+    scoreRange: jsonb("score_range"),
+    // Score shrunk toward neutral for uncertainty; drives the recommendation.
+    adjustedScore: real("adjusted_score"),
+    // Importance-weighted share of the model with usable data, 0-1.
+    dataCoverage: real("data_coverage"),
     fairValueEstimate: real("fair_value_estimate"),
     categoryScores: jsonb("category_scores").notNull(),
     categories: jsonb("categories").notNull(),

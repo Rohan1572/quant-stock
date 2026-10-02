@@ -1,11 +1,9 @@
-// Indicative NSE/BSE sector benchmark medians used as comparison points for
-// valuation and profitability scoring (spec §3.1/§3.3). This is a static
-// reference table, not a live peer-clustering computation — true
-// sector-relative percentile ranking against a dynamically fetched peer set
-// is deferred to v2 (spec §7, scikit-learn item). Values are broad,
-// order-of-magnitude Indian-market benchmarks, not date-stamped consensus
-// figures — "See the Details" labels them as sector benchmarks so users
-// know they're indicative, not live peer medians.
+// Indicative NSE/BSE sector benchmark medians (spec §3.1/§3.3). Static
+// reference values, not live peer medians — sector-relative percentile ranking
+// is deferred to v2 (spec §7).
+//
+// Scoring also needs each metric's *dispersion*: a raw gap to the median means
+// nothing without knowing how spread out sector peers are.
 export interface SectorBenchmark {
   peRatio: number;
   pbRatio: number;
@@ -167,7 +165,62 @@ export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
   },
 };
 
+/**
+ * One standard deviation per metric, used to turn the gap to a sector median
+ * into a z-score. Deliberately generous: understating sigma makes ordinary
+ * variation look like a strong signal. A log sigma of 0.45 means the sector
+ * multiple typically varies by a factor of ~1.57x between peers.
+ */
+export interface MetricDispersion {
+  /** Log-space sigma for multiplicative valuation multiples. */
+  logMultiple: number;
+  /** Sigma in percentage points for margin/return metrics. */
+  percentPoints: number;
+  /** Sigma in raw ratio units for balance-sheet ratio metrics. */
+  ratio: number;
+}
+
+export const DISPERSION: MetricDispersion = {
+  logMultiple: 0.45,
+  percentPoints: 8,
+  ratio: 0.6,
+};
+
+// Market-wide (not sector-relative) dispersions for categories where a sector
+// median is not the right reference point.
+export const GROWTH_DISPERSION = 12; // percentage points
+export const MOMENTUM_DISPERSION = 18; // percentage points
+export const RISK_DISPERSION = 0.45; // beta units
+export const VOLATILITY_DISPERSION = 15; // percentage points, annualised
+export const DRAWDOWN_DISPERSION = 18; // percentage points
+export const LIQUIDITY_DISPERSION = 0.5; // current/quick ratio units
+
+// Yahoo sometimes returns sectors with different casing or trailing
+// qualifiers; normalising avoids falling back for a sector we do have.
+function normaliseSector(sector: string): string {
+  return sector.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Sector keys in the table, pre-normalised for case/whitespace-insensitive lookup. */
+const NORMALISED_BENCHMARKS: Map<string, SectorBenchmark> = new Map(
+  Object.entries(SECTOR_BENCHMARKS).map(([key, value]) => [
+    normaliseSector(key),
+    value,
+  ]),
+);
+
 export function getSectorBenchmark(sector: string | null): SectorBenchmark {
   if (!sector) return DEFAULT_BENCHMARK;
-  return SECTOR_BENCHMARKS[sector] ?? DEFAULT_BENCHMARK;
+  return (
+    NORMALISED_BENCHMARKS.get(normaliseSector(sector)) ?? DEFAULT_BENCHMARK
+  );
+}
+
+/**
+ * Whether a real sector benchmark was found, as opposed to the fallback —
+ * scored against the wrong reference distribution deserves lower confidence.
+ */
+export function hasSectorBenchmark(sector: string | null): boolean {
+  if (!sector) return false;
+  return NORMALISED_BENCHMARKS.has(normaliseSector(sector));
 }

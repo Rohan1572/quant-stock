@@ -598,13 +598,16 @@ export default function StockScore() {
         </Card>
 
         {/* My Position */}
-        {!isLoading && stock?.price != null && score?.overallScore != null && (
+        {!isLoading && stock?.price != null && score?.adjustedScore != null && (
           <div className="mb-8">
             <PositionCard
               ticker={decodedTicker}
               currentPrice={stock.price}
               currency={stock.currency ?? "INR"}
-              score={score.overallScore}
+              // The confidence-adjusted score, matching what drives the
+              // recommendation. Using the raw score here let this card advise
+              // "add to position" while the badge above said "hold".
+              score={score.adjustedScore}
             />
           </div>
         )}

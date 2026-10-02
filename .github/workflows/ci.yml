@@ -38,3 +38,43 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  migrations:
+    # Migrations only mean something against a real Postgres, and a broken one
+    # otherwise surfaces as a failed deploy rather than a failed build.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: quantstock
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/quantstock
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Migrate up
+        run: npm run --workspace=@workspace/db migrate
+
+      # Leaves the schema at the pre-migration state, which must still apply
+      # cleanly, so the down path cannot rot unnoticed.
+      - name: Migrate down
+        run: npm run --workspace=@workspace/db migrate:down
+
+      - name: Migrate up again
+        run: npm run --workspace=@workspace/db migrate

@@ -30,7 +30,10 @@ export interface PositionAdvice {
  * @param score       0–100 quant score
  * @param pnlPct      unrealised P&L % ((currentPrice - avgCost) / avgCost * 100)
  */
-export function getPositionAdvice(score: number, pnlPct: number): PositionAdvice {
+export function getPositionAdvice(
+  score: number,
+  pnlPct: number,
+): PositionAdvice {
   const up = pnlPct > 0;
   const bigUp = pnlPct >= 20;
   const smallUp = pnlPct >= 5 && pnlPct < 20;

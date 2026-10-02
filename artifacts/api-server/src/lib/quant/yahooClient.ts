@@ -143,7 +143,12 @@ export async function yahooChart(
     chart?: {
       result?: Array<{
         timestamp?: number[];
-        indicators?: { quote?: Array<{ close?: (number | null)[]; volume?: (number | null)[] }> };
+        indicators?: {
+          quote?: Array<{
+            close?: (number | null)[];
+            volume?: (number | null)[];
+          }>;
+        };
       }>;
       error?: unknown;
     };
@@ -212,7 +217,10 @@ export async function yahooQuoteSummary(
 export function raw(value: unknown): number | null {
   if (value == null) return null;
   if (typeof value === "number") return value;
-  if (typeof value === "object" && "raw" in (value as Record<string, unknown>)) {
+  if (
+    typeof value === "object" &&
+    "raw" in (value as Record<string, unknown>)
+  ) {
     const r = (value as { raw?: unknown }).raw;
     return typeof r === "number" ? r : null;
   }

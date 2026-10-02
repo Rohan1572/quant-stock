@@ -9,9 +9,12 @@ export default function NotFound() {
         <AlertCircle className="w-8 h-8" />
       </div>
       <h1 className="text-4xl font-extrabold tracking-tight mb-2">404</h1>
-      <h2 className="text-xl font-semibold mb-6 text-muted-foreground">Resource not found</h2>
+      <h2 className="text-xl font-semibold mb-6 text-muted-foreground">
+        Resource not found
+      </h2>
       <p className="text-muted-foreground mb-8 max-w-sm">
-        The stock or page you're looking for doesn't exist or is currently unavailable in our database.
+        The stock or page you're looking for doesn't exist or is currently
+        unavailable in our database.
       </p>
       <Link href="/">
         <Button size="lg" className="font-bold">

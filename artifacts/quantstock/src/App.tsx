@@ -1,14 +1,14 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from '@/components/ui/toaster';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import NotFound from '@/pages/not-found';
-import { Route, Switch, Router as WouterRouter } from 'wouter';
-import { Shell } from '@/components/layout/Shell';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import NotFound from "@/pages/not-found";
+import { Route, Switch, Router as WouterRouter } from "wouter";
+import { Shell } from "@/components/layout/Shell";
 
-import Home from '@/pages/Home';
-import StockScore from '@/pages/StockScore';
-import ScoringConfig from '@/pages/ScoringConfig';
-import Rankings from '@/pages/Rankings';
+import Home from "@/pages/Home";
+import StockScore from "@/pages/StockScore";
+import ScoringConfig from "@/pages/ScoringConfig";
+import Rankings from "@/pages/Rankings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,7 +37,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Router />
         </WouterRouter>
         <Toaster />

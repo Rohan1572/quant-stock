@@ -1,33 +1,31 @@
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as React from "react"
-import { useForm } from "react-hook-form"
-import * as z from "zod"
+import * as React from "react";
+import { useForm } from "react-hook-form";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 const Form = React.forwardRef<
   HTMLFormElement,
   React.FormHTMLAttributes<HTMLFormElement>
 >(({ className, ...props }, ref) => (
   <form ref={ref} className={cn("space-y-6", className)} {...props} />
-))
-Form.displayName = "Form"
+));
+Form.displayName = "Form";
 
 const FormField = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
   <div ref={ref} className={cn("space-y-2", className)} {...props} />
-))
-FormField.displayName = "FormField"
+));
+FormField.displayName = "FormField";
 
 const FormItem = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
   <div ref={ref} className={cn("space-y-2", className)} {...props} />
-))
-FormItem.displayName = "FormItem"
+));
+FormItem.displayName = "FormItem";
 
 const FormLabel = React.forwardRef<
   HTMLLabelElement,
@@ -37,18 +35,18 @@ const FormLabel = React.forwardRef<
     ref={ref}
     className={cn(
       "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-      className
+      className,
     )}
     {...props}
   />
-))
-FormLabel.displayName = "FormLabel"
+));
+FormLabel.displayName = "FormLabel";
 
 const FormControl = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
->(({ ...props }, ref) => <div ref={ref} {...props} />)
-FormControl.displayName = "FormControl"
+>(({ ...props }, ref) => <div ref={ref} {...props} />);
+FormControl.displayName = "FormControl";
 
 const FormDescription = React.forwardRef<
   HTMLParagraphElement,
@@ -59,15 +57,15 @@ const FormDescription = React.forwardRef<
     className={cn("text-sm text-muted-foreground", className)}
     {...props}
   />
-))
-FormDescription.displayName = "FormDescription"
+));
+FormDescription.displayName = "FormDescription";
 
 const FormMessage = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, children, ...props }, ref) => {
   if (!children) {
-    return null
+    return null;
   }
 
   return (
@@ -78,9 +76,9 @@ const FormMessage = React.forwardRef<
     >
       {children}
     </p>
-  )
-})
-FormMessage.displayName = "FormMessage"
+  );
+});
+FormMessage.displayName = "FormMessage";
 
 export {
   useForm,
@@ -91,4 +89,4 @@ export {
   FormDescription,
   FormMessage,
   FormField,
-}
+};

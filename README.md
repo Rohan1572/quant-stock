@@ -76,12 +76,32 @@ If the OpenAPI contract changes, regenerate the client and schema code:
 npm run codegen
 ```
 
-## 6. Typecheck and build
+## 6. Typecheck, test, lint and build
 
 Run the full workspace validation:
 
 ```powershell
 npm run typecheck
+```
+
+Run the scoring engine test suite:
+
+```powershell
+npm run test
+```
+
+Run the SonarJS quality rules (the same analyzer SonarQube applies to JS/TS,
+without needing a server):
+
+```powershell
+npm run lint
+```
+
+Check or apply formatting (Prettier; generated code is ignored):
+
+```powershell
+npm run format:check
+npm run format
 ```
 
 Build everything:
@@ -92,7 +112,7 @@ npm run build
 
 ## Project structure
 
-- `artifacts/api-server/` — Express API server
+- `artifacts/api-server/` — Express API server (scoring engine + test suite)
 - `artifacts/quantstock/` — main React/Vite frontend
 - `artifacts/mockup-sandbox/` — Vite mockup playground
 - `lib/api-spec/` — OpenAPI contract and codegen config

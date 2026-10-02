@@ -12,7 +12,11 @@
     "reinstall": "node -e \"const fs=require('fs');for(const p of ['node_modules','package-lock.json','.package-lock.json'])fs.rmSync(p,{recursive:true,force:true});\" && npm cache clean --force && npm i",
     "typecheck:libs": "tsc --build",
     "typecheck": "npm run typecheck:libs && npm run typecheck:apps",
-    "typecheck:apps": "npm run --workspaces --if-present typecheck"
+    "test": "npm run --workspaces --if-present test",
+    "typecheck:apps": "npm run --workspaces --if-present typecheck",
+    "lint": "eslint -c eslint.sonar.config.mjs artifacts/api-server/src artifacts/quantstock/src lib/db/src lib/api-spec/orval.config.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "workspaces": [
     "artifacts/*",
@@ -26,10 +30,14 @@
     "regexparam": "3.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "9.18.0",
+    "eslint": "9.18.0",
+    "eslint-plugin-sonarjs": "3.0.1",
     "lightningcss": "1.33.0",
     "prettier": "3.9.5",
     "tapable": "2.3.3",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.20.0"
   },
   "allowScripts": {
     "@hookform/resolvers@3.10.0": true,

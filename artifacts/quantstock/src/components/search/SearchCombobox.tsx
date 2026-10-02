@@ -1,18 +1,21 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Search, Loader2, ArrowRight } from "lucide-react";
-import { useSearchStocks, getSearchStocksQueryKey } from "@workspace/api-client-react";
+import {
+  useSearchStocks,
+  getSearchStocksQueryKey,
+} from "@workspace/api-client-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-export function SearchCombobox({ 
-  className, 
+export function SearchCombobox({
+  className,
   autoFocus = false,
   compact = false,
-}: { 
-  className?: string;
-  autoFocus?: boolean;
-  compact?: boolean;
+}: {
+  readonly className?: string;
+  readonly autoFocus?: boolean;
+  readonly compact?: boolean;
 }) {
   const [, setLocation] = useLocation();
   const [query, setQuery] = useState("");
@@ -31,13 +34,21 @@ export function SearchCombobox({
   // Fetch search results
   const { data: results, isLoading } = useSearchStocks(
     { q: debouncedQuery },
-    { query: { enabled: debouncedQuery.length > 0, queryKey: getSearchStocksQueryKey({ q: debouncedQuery }) } }
+    {
+      query: {
+        enabled: debouncedQuery.length > 0,
+        queryKey: getSearchStocksQueryKey({ q: debouncedQuery }),
+      },
+    },
   );
 
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     }
@@ -50,7 +61,7 @@ export function SearchCombobox({
     setLocation(`/stocks/${encodeURIComponent(ticker.toUpperCase())}`);
   };
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (query.trim()) {
       handleSelect(query.trim());
@@ -58,32 +69,59 @@ export function SearchCombobox({
   };
 
   return (
-    <div ref={containerRef} className={cn("relative w-full", compact ? "max-w-xs" : "max-w-2xl mx-auto", className)}>
+    <div
+      ref={containerRef}
+      className={cn(
+        "relative w-full",
+        compact ? "max-w-xs" : "max-w-2xl mx-auto",
+        className,
+      )}
+    >
       <form onSubmit={onSubmit} className="relative">
         <div className="relative group">
-          <Search className={cn("absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors", compact ? "w-3.5 h-3.5" : "w-5 h-5 left-4")} />
+          <Search
+            className={cn(
+              "absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors",
+              compact ? "w-3.5 h-3.5" : "w-5 h-5 left-4",
+            )}
+          />
           <Input
             type="search"
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setIsOpen(true); }}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setIsOpen(true);
+            }}
             onFocus={() => setIsOpen(true)}
-            placeholder={compact ? "Search tickers…" : "Search tickers (e.g. RELIANCE, TCS, INFY)"}
+            placeholder={
+              compact
+                ? "Search tickers…"
+                : "Search tickers (e.g. RELIANCE, TCS, INFY)"
+            }
             autoFocus={autoFocus}
             className={cn(
               "bg-card border-input focus-visible:border-primary font-mono uppercase",
               compact
                 ? "pl-8 pr-8 h-8 text-xs rounded-md border"
-                : "pl-12 pr-12 h-14 text-lg border-2 shadow-sm rounded-xl"
+                : "pl-12 pr-12 h-14 text-lg border-2 shadow-sm rounded-xl",
             )}
             data-testid="input-ticker-search"
           />
           {isLoading && query === debouncedQuery && query.length > 0 && (
-            <Loader2 className={cn("absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground animate-spin", compact ? "w-3 h-3" : "w-5 h-5 right-4")} />
+            <Loader2
+              className={cn(
+                "absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground animate-spin",
+                compact ? "w-3 h-3" : "w-5 h-5 right-4",
+              )}
+            />
           )}
           {!isLoading && query.length > 0 && (
             <button
               type="submit"
-              className={cn("absolute right-2 top-1/2 -translate-y-1/2 bg-primary/10 text-primary rounded hover:bg-primary hover:text-primary-foreground transition-colors", compact ? "p-0.5" : "p-1.5 right-3")}
+              className={cn(
+                "absolute right-2 top-1/2 -translate-y-1/2 bg-primary/10 text-primary rounded hover:bg-primary hover:text-primary-foreground transition-colors",
+                compact ? "p-0.5" : "p-1.5 right-3",
+              )}
               data-testid="button-search-submit"
             >
               <ArrowRight className={compact ? "w-3 h-3" : "w-4 h-4"} />
@@ -99,7 +137,8 @@ export function SearchCombobox({
               <Loader2 className="w-4 h-4 animate-spin" />
               Searching database...
             </div>
-          ) : results && results.length > 0 ? (
+          ) : null}
+          {!isLoading && results && results.length > 0 && (
             <ul className="max-h-[300px] overflow-auto py-2">
               {results.map((stock) => (
                 <li key={stock.ticker}>
@@ -121,9 +160,11 @@ export function SearchCombobox({
                 </li>
               ))}
             </ul>
-          ) : (
+          )}
+          {!isLoading && !(results && results.length > 0) && (
             <div className="p-4 text-center text-sm text-muted-foreground">
-              No exact matches for <span className="font-mono">{query}</span>. Press enter to force scan.
+              No exact matches for <span className="font-mono">{query}</span>.
+              Press enter to force scan.
             </div>
           )}
         </div>

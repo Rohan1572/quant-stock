@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Wallet, Pencil, Trash2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import {
+  Wallet,
+  Pencil,
+  Trash2,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,10 +16,10 @@ import { useHolding } from "@/hooks/useHolding";
 import { getPositionAdvice } from "@/lib/positionAdvice";
 
 interface Props {
-  ticker: string;
-  currentPrice: number;
-  currency?: string;
-  score: number;
+  readonly ticker: string;
+  readonly currentPrice: number;
+  readonly currency?: string;
+  readonly score: number;
 }
 
 const currencySymbol = (c?: string) => (c === "INR" || !c ? "₹" : c + " ");
@@ -71,8 +78,8 @@ export function PositionCard({ ticker, currentPrice, currency, score }: Props) {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-4">
-            Enter your position so we can give you advice based on your cost basis,
-            not just the stock fundamentals.
+            Enter your position so we can give you advice based on your cost
+            basis, not just the stock fundamentals.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div className="space-y-1.5">
@@ -87,7 +94,9 @@ export function PositionCard({ ticker, currentPrice, currency, score }: Props) {
                 onChange={(e) => setQty(e.target.value)}
                 className={errors.qty ? "border-destructive" : ""}
               />
-              {errors.qty && <p className="text-xs text-destructive">{errors.qty}</p>}
+              {errors.qty && (
+                <p className="text-xs text-destructive">{errors.qty}</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="avgCost">Average buy price ({sym})</Label>
@@ -101,11 +110,15 @@ export function PositionCard({ ticker, currentPrice, currency, score }: Props) {
                 onChange={(e) => setAvgCost(e.target.value)}
                 className={errors.avgCost ? "border-destructive" : ""}
               />
-              {errors.avgCost && <p className="text-xs text-destructive">{errors.avgCost}</p>}
+              {errors.avgCost && (
+                <p className="text-xs text-destructive">{errors.avgCost}</p>
+              )}
             </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={handleSave} className="flex-1">Save Position</Button>
+            <Button onClick={handleSave} className="flex-1">
+              Save Position
+            </Button>
             {holding && (
               <Button variant="outline" onClick={() => setEditing(false)}>
                 Cancel
@@ -153,7 +166,12 @@ export function PositionCard({ ticker, currentPrice, currency, score }: Props) {
             My Position
           </CardTitle>
           <div className="flex gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleEdit}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleEdit}
+            >
               <Pencil className="w-3.5 h-3.5" />
             </Button>
             <Button
@@ -171,8 +189,16 @@ export function PositionCard({ ticker, currentPrice, currency, score }: Props) {
         {/* Position stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Stat label="Shares" value={quantity.toLocaleString("en-IN")} mono />
-          <Stat label="Avg Cost" value={`${sym}${cost.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`} mono />
-          <Stat label="Current Value" value={`${sym}${currentValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`} mono />
+          <Stat
+            label="Avg Cost"
+            value={`${sym}${cost.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`}
+            mono
+          />
+          <Stat
+            label="Current Value"
+            value={`${sym}${currentValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
+            mono
+          />
           <div className="p-3 rounded-lg bg-secondary/40 border">
             <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
               Unrealised P&amp;L
@@ -184,7 +210,9 @@ export function PositionCard({ ticker, currentPrice, currency, score }: Props) {
             >
               {pnlAbs >= 0 ? "+" : ""}
               {sym}
-              {Math.abs(pnlAbs).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+              {Math.abs(pnlAbs).toLocaleString("en-IN", {
+                maximumFractionDigits: 0,
+              })}
             </div>
             <div
               className={`text-xs font-mono mt-0.5 ${
@@ -205,7 +233,10 @@ export function PositionCard({ ticker, currentPrice, currency, score }: Props) {
             </span>
           </div>
           <div className="flex items-start gap-3">
-            <Badge variant={colors.badge} className="shrink-0 text-sm px-3 py-1 font-bold uppercase tracking-wide flex items-center gap-1.5">
+            <Badge
+              variant={colors.badge}
+              className="shrink-0 text-sm px-3 py-1 font-bold uppercase tracking-wide flex items-center gap-1.5"
+            >
               {colors.icon}
               {advice.label}
             </Badge>
@@ -219,11 +250,23 @@ export function PositionCard({ ticker, currentPrice, currency, score }: Props) {
   );
 }
 
-function Stat({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function Stat({
+  label,
+  value,
+  mono,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly mono?: boolean;
+}) {
   return (
     <div className="p-3 rounded-lg bg-secondary/40 border">
-      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">{label}</div>
-      <div className={`text-sm font-bold ${mono ? "font-mono" : ""}`}>{value}</div>
+      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+        {label}
+      </div>
+      <div className={`text-sm font-bold ${mono ? "font-mono" : ""}`}>
+        {value}
+      </div>
     </div>
   );
 }

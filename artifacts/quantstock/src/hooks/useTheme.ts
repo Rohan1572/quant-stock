@@ -8,9 +8,14 @@ function getInitialTheme(): Theme {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "dark" || stored === "light") return stored;
-  } catch {}
+  } catch {
+    // localStorage is unavailable in some privacy modes; fall through to the
+    // OS preference rather than failing to pick a theme.
+  }
   // Respect OS preference on first visit
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
 }
 
 function applyTheme(theme: Theme) {
@@ -28,7 +33,9 @@ export function useTheme() {
     applyTheme(theme);
     try {
       localStorage.setItem(STORAGE_KEY, theme);
-    } catch {}
+    } catch {
+      // Persistence is best-effort; the theme still applies for this session.
+    }
   }, [theme]);
 
   const toggle = () => setTheme((t) => (t === "dark" ? "light" : "dark"));

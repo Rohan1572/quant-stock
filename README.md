@@ -115,11 +115,19 @@ npm run build
 - `artifacts/api-server/` — Express API server (scoring engine + test suite)
 - `artifacts/quantstock/` — main React/Vite frontend
 - `artifacts/mockup-sandbox/` — Vite mockup playground
+- `docs/` — scoring model notes and data-source caveats
 - `lib/api-spec/` — OpenAPI contract and codegen config
 - `lib/api-client-react/` — generated React API client
 - `lib/api-zod/` — generated Zod schemas
 - `lib/db/` — Drizzle schema and migrations setup
 - `scripts/` — workspace helper scripts
+
+## Scoring model
+
+The score is a weighted blend of six categories, each scored against sector
+benchmarks. Read `docs/scoring-model.md` before changing it — it covers the
+invariants that are easy to break, and the caveats in the upstream data feed
+that have already caused wrong results.
 
 ## Troubleshooting
 

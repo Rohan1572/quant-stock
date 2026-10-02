@@ -247,7 +247,16 @@ components:
     Stock:
       type: object
       required:
-        [ticker, companyName, sector, industry, marketCap, currency, price, lastUpdated]
+        [
+          ticker,
+          companyName,
+          sector,
+          industry,
+          marketCap,
+          currency,
+          price,
+          lastUpdated,
+        ]
       properties:
         ticker:
           type: string
@@ -320,6 +329,11 @@ components:
           overallScore,
           recommendation,
           confidence,
+          confidenceLevel,
+          confidenceBreakdown,
+          scoreRange,
+          adjustedScore,
+          dataCoverage,
           categoryScores,
           topFactors,
           riskFlags,
@@ -335,6 +349,18 @@ components:
           type: string
           enum: [strong_buy, buy, hold, reduce, sell, strong_short]
         confidence:
+          type: number
+        confidenceLevel:
+          type: string
+          enum: [low, moderate, high]
+        confidenceBreakdown:
+          $ref: "#/components/schemas/ConfidenceBreakdown"
+        scoreRange:
+          $ref: "#/components/schemas/ScoreRange"
+        adjustedScore:
+          type: number
+          description: Score shrunk toward neutral for uncertainty; drives the recommendation
+        dataCoverage:
           type: number
         fairValueEstimate:
           type: ["number", "null"]
@@ -354,9 +380,59 @@ components:
           type: string
           format: date-time
 
+    ScoreRange:
+      type: object
+      required: [low, high]
+      description: >-
+        95% interval around the score. The model cannot claim more precision
+        than this; a wide band means the point estimate should not be read literally.
+      properties:
+        low:
+          type: number
+        high:
+          type: number
+
+    ConfidenceBreakdown:
+      type: object
+      required:
+        [
+          dataCoverage,
+          metricDiversity,
+          dataQuality,
+          benchmarkQuality,
+          historyQuality,
+        ]
+      description: Per-component drivers behind the confidence score, each 0-1.
+      properties:
+        dataCoverage:
+          type: number
+          description: Importance-weighted share of the model that had usable data
+        metricDiversity:
+          type: number
+          description: How independent the available metrics are of each other
+        dataQuality:
+          type: number
+          description: Data freshness and internal consistency of the snapshot
+        benchmarkQuality:
+          type: number
+          description: Whether a sector-specific benchmark was available
+        historyQuality:
+          type: number
+          description: Sufficiency, recency and variety of the price history
+
     MetricDetail:
       type: object
-      required: [key, label, value, score, higherIsBetter]
+      required:
+        [
+          key,
+          label,
+          value,
+          score,
+          higherIsBetter,
+          weight,
+          available,
+          meaningful,
+        ]
       properties:
         key:
           type: string
@@ -368,12 +444,24 @@ components:
           type: ["number", "null"]
         score:
           type: number
+          description: >-
+            0-100 contribution of this metric. Excluded from the category average
+            when `meaningful` is false (e.g. P/E of a loss-making company).
         higherIsBetter:
           type: boolean
+        weight:
+          type: number
+          description: Relative importance of this metric within its category
+        available:
+          type: boolean
+          description: False when the underlying value was missing
+        meaningful:
+          type: boolean
+          description: False when the value existed but was economically meaningless
 
     CategoryDetail:
       type: object
-      required: [category, weight, score, metrics]
+      required: [category, weight, score, metrics, coverage, volatility]
       properties:
         category:
           type: string
@@ -381,6 +469,12 @@ components:
           type: number
         score:
           type: number
+        coverage:
+          type: number
+          description: Share of this category's intended weight that had usable data, 0-1
+        volatility:
+          type: number
+          description: Standard deviation of this category's score, in score points
         metrics:
           type: array
           items:
@@ -392,10 +486,21 @@ components:
       properties:
         wacc:
           type: number
+          description: Company-specific CAPM-derived discount rate
         terminalGrowthRate:
           type: number
         projectionYears:
           type: integer
+        riskFreeRate:
+          type: number
+        equityRiskPremium:
+          type: number
+        beta:
+          type: number
+        initialGrowthRate:
+          type: number
+        terminalYearGrowthRate:
+          type: number
 
     ScoreDetails:
       type: object
@@ -405,6 +510,11 @@ components:
           overallScore,
           recommendation,
           confidence,
+          confidenceLevel,
+          confidenceBreakdown,
+          scoreRange,
+          adjustedScore,
+          dataCoverage,
           categoryScores,
           categories,
           topFactors,
@@ -422,6 +532,18 @@ components:
           type: string
           enum: [strong_buy, buy, hold, reduce, sell, strong_short]
         confidence:
+          type: number
+        confidenceLevel:
+          type: string
+          enum: [low, moderate, high]
+        confidenceBreakdown:
+          $ref: "#/components/schemas/ConfidenceBreakdown"
+        scoreRange:
+          $ref: "#/components/schemas/ScoreRange"
+        adjustedScore:
+          type: number
+          description: Score shrunk toward neutral for uncertainty; drives the recommendation
+        dataCoverage:
           type: number
         fairValueEstimate:
           type: ["number", "null"]
@@ -538,7 +660,17 @@ components:
 
     RankingItem:
       type: object
-      required: [rank, ticker, companyName, sector, overallScore, recommendation, confidence, computedAt]
+      required:
+        [
+          rank,
+          ticker,
+          companyName,
+          sector,
+          overallScore,
+          recommendation,
+          confidence,
+          computedAt,
+        ]
       properties:
         rank:
           type: integer
@@ -555,6 +687,11 @@ components:
           enum: [strong_buy, buy, hold, reduce, sell, strong_short]
         confidence:
           type: number
+        confidenceLevel:
+          type: string
+          enum: [low, moderate, high]
+        scoreRange:
+          $ref: "#/components/schemas/ScoreRange"
         computedAt:
           type: string
           format: date-time

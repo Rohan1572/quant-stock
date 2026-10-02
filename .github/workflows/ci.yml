@@ -24,6 +24,11 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Every workspace must declare what it imports; transitive resolution
+      # works until an unrelated package changes its tree.
+      - name: Audit dependencies
+        run: npm run audit:deps
+
       - name: Typecheck
         run: npm run typecheck
 

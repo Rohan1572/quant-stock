@@ -104,6 +104,12 @@ npm run format:check
 npm run format
 ```
 
+Check that every workspace declares what it imports:
+
+```powershell
+npm run audit:deps
+```
+
 Build everything:
 
 ```powershell

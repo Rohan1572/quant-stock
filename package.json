@@ -12,6 +12,7 @@
     "reinstall": "node -e \"const fs=require('fs');for(const p of ['node_modules','package-lock.json','.package-lock.json'])fs.rmSync(p,{recursive:true,force:true});\" && npm cache clean --force && npm i",
     "typecheck:libs": "tsc --build",
     "typecheck": "npm run typecheck:libs && npm run typecheck:apps",
+    "audit:deps": "node ./scripts/audit-dependencies.mjs",
     "test": "npm run --workspaces --if-present test",
     "typecheck:apps": "npm run --workspaces --if-present typecheck",
     "lint": "eslint -c eslint.sonar.config.mjs artifacts/api-server/src artifacts/quantstock/src lib/db/src lib/api-spec/orval.config.ts",

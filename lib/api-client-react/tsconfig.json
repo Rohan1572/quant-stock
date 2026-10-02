@@ -6,7 +6,8 @@
     "emitDeclarationOnly": true,
     "outDir": "dist",
     "rootDir": "src",
-    "lib": ["dom", "es2022"]
+    // orval's generated fetch helper iterates `Headers`, which needs dom.iterable.
+    "lib": ["dom", "dom.iterable", "es2022"]
   },
   "include": ["src"]
 }

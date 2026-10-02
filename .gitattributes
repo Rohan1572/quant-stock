@@ -1,0 +1,11 @@
+# Normalise line endings in the repository and check out LF everywhere.
+#
+# Git for Windows installs `core.autocrlf=true` at system level, which wrote
+# CRLF into the working tree and made every commit warn that LF would be
+# replaced by CRLF. Setting eol=lf here makes checkout deterministic across
+# platforms and matches what Prettier produces.
+* text=auto eol=lf
+
+# These are generated and should never be diffed for line endings.
+lib/api-client-react/src/generated/** linguist-generated=true
+lib/api-zod/src/generated/** linguist-generated=true

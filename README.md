@@ -110,6 +110,17 @@ Build everything:
 npm run build
 ```
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs typecheck, tests, lint, format check and build on
+every push to `main` and on every pull request, so the checks above are enforced
+rather than left to habit. It needs no database — the scoring engine's tests run
+on fixtures.
+
+Changes that touch the API contract must run `npm run codegen` and commit the
+generated output; CI runs `npm ci`, which fails if `package.json` and
+`package-lock.json` have drifted apart.
+
 ## Project structure
 
 - `artifacts/api-server/` — Express API server (scoring engine + test suite)

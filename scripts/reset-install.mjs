@@ -19,39 +19,9 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+import { root, workspaces } from "./workspaces.mjs";
 
 const LOCKFILES = ["package-lock.json", "npm-shrinkwrap.json"];
-
-/** Every workspace directory from the root package.json, plus the root itself. */
-function workspaces() {
-  const pkg = JSON.parse(
-    fs.readFileSync(path.join(root, "package.json"), "utf8"),
-  );
-  const dirs = new Set([root]);
-  for (const pattern of pkg.workspaces ?? []) {
-    // Only the simple "dir/*" form is used here; anything else is a no-op
-    // rather than a silently wrong guess.
-    if (!pattern.endsWith("/*")) {
-      const direct = path.join(root, pattern);
-      if (fs.existsSync(direct)) dirs.add(direct);
-      continue;
-    }
-    const parent = path.join(root, pattern.slice(0, -2));
-    if (!fs.existsSync(parent)) continue;
-    for (const entry of fs.readdirSync(parent, { withFileTypes: true })) {
-      if (
-        entry.isDirectory() &&
-        fs.existsSync(path.join(parent, entry.name, "package.json"))
-      ) {
-        dirs.add(path.join(parent, entry.name));
-      }
-    }
-  }
-  return [...dirs];
-}
 
 let removed = 0;
 for (const dir of workspaces()) {

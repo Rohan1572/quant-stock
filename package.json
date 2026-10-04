@@ -44,7 +44,7 @@
   "allowScripts": {
     "@hookform/resolvers@3.10.0": true,
     "esbuild": true,
-    "react-hook-form@7.85.0": true,
+    "react-hook-form@7.81.0": true,
     "recharts@3.10.1": true,
     "tailwindcss-animate@1.0.7": true
   }

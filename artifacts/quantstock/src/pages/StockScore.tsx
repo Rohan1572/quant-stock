@@ -16,7 +16,6 @@ import {
   useGetStock,
   useGetStockScore,
   useGetStockScoreDetails,
-  getGetStockScoreDetailsQueryKey,
 } from "@workspace/api-client-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -182,10 +181,7 @@ export default function StockScore() {
   } = useGetStockScore(decodedTicker);
   const { data: details, isLoading: isDetailsLoading } =
     useGetStockScoreDetails(decodedTicker, {
-      query: {
-        enabled: showDetails,
-        queryKey: getGetStockScoreDetailsQueryKey(decodedTicker),
-      },
+      query: { enabled: showDetails },
     });
 
   if (isStockError || isScoreError) {

@@ -30,6 +30,13 @@ export default defineConfig({
       clean: true,
       prettier: true,
       override: {
+        // The app depends on @tanstack/react-query v5, but this package does not
+        // declare it, so orval cannot detect the version and falls back to v4
+        // signatures. Those type `query` as a full UseQueryOptions, forcing
+        // every call site to restate queryKey and queryFn by hand.
+        query: {
+          version: 5,
+        },
         fetch: {
           includeHttpResponseReturnType: false,
         },

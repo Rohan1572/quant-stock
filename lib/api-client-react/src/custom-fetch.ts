@@ -87,14 +87,21 @@ function applyBaseUrl(input: RequestInfo | URL): RequestInfo | URL {
 // on): callers such as `resolveMethod` and `resolveUrl` branch on that exact
 // type afterwards. One return type would mean always allocating a Request,
 // copying body/metadata on every request.
-// eslint-disable-next-line sonarjs/function-return-type
+//
+// A single exit keeps that polymorphism without tripping
+// sonarjs/function-return-type, which flags the several-returns-per-branch
+// shape. isRequest narrows the type, so the `as Request` cast is unneeded.
 function rebuildInput(
   input: RequestInfo | URL,
   absolute: string,
 ): RequestInfo | URL {
-  if (typeof input === "string") return absolute;
-  if (isUrl(input)) return new URL(absolute);
-  return new Request(absolute, input as Request);
+  let rebuilt: RequestInfo | URL = absolute;
+  if (isUrl(input)) {
+    rebuilt = new URL(absolute);
+  } else if (isRequest(input)) {
+    rebuilt = new Request(absolute, input);
+  }
+  return rebuilt;
 }
 
 function resolveUrl(input: RequestInfo | URL): string {

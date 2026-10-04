@@ -37,10 +37,6 @@ export default [
     },
     rules: {
       ...sonarjs.configs.recommended.rules,
-      // Generated files and this config file are not hand-written product code.
-      "sonarjs/no-duplicate-string": "off",
-      "sonarjs/no-identical-functions": "off",
-      "sonarjs/cognitive-complexity": "off",
       // Applying this in statistics.ts would change behaviour: the guards use
       // `!(x > 0)` rather than `x <= 0` precisely because `NaN <= 0` is false,
       // so the suggested rewrite would let a NaN through as a real score. The
@@ -49,9 +45,10 @@ export default [
     },
   },
   {
-    // Entry points / config files have no project context.
+    // Build scripts and config files have no TypeScript project context. They
+    // are not among the `lint` script's paths, so this block only applies when
+    // one is passed explicitly on the command line.
     files: ["**/*.mjs", "**/*.config.*"],
     languageOptions: { parserOptions: { project: null } },
-    rules: { "sonarjs/no-duplicate-string": "off" },
   },
 ];

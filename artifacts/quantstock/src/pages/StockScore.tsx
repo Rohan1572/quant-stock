@@ -16,6 +16,7 @@ import {
   useGetStock,
   useGetStockScore,
   useGetStockScoreDetails,
+  getStockScore,
 } from "@workspace/api-client-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -160,55 +161,30 @@ function ConfidenceBreakdownBar({
   );
 }
 
-export default function StockScore() {
-  const { ticker } = useParams<{ ticker: string }>();
-  const decodedTicker = decodeURIComponent(ticker).toUpperCase();
-
-  type ChartRange = "1m" | "6m" | "1y" | "5y";
-
-  const [chartRange, setChartRange] = useState<ChartRange>("1y");
-  const [showDetails, setShowDetails] = useState(false);
-
-  const {
-    data: stock,
-    isLoading: isStockLoading,
-    isError: isStockError,
-  } = useGetStock(decodedTicker);
-  const {
-    data: score,
-    isLoading: isScoreLoading,
-    isError: isScoreError,
-  } = useGetStockScore(decodedTicker);
-  const { data: details, isLoading: isDetailsLoading } =
-    useGetStockScoreDetails(decodedTicker, {
-      query: { enabled: showDetails },
-    });
-
-  if (isStockError || isScoreError) {
+/**
+ * The score dial: uncertainty band, point estimate, recommendation badge and
+ * confidence. Split out of StockScore purely to keep that component's
+ * complexity down; it reads `score` defensively because it renders before the
+ * request resolves.
+ */
+function QuantScoreDial({
+  score,
+  isLoading,
+}: Readonly<{
+  score: Awaited<ReturnType<typeof getStockScore>> | undefined;
+  isLoading: boolean;
+}>) {
+  if (isLoading) {
     return (
-      <div className="flex-1 container max-w-5xl mx-auto py-8 px-4 flex flex-col items-center justify-center text-center">
-        <ShieldAlert className="w-16 h-16 text-destructive mb-4" />
-        <h2 className="text-2xl font-bold mb-2">Ticker Not Found</h2>
-        <p className="text-muted-foreground mb-6">
-          Could not find scoring data for {decodedTicker}.
-        </p>
-        <Link href="/">
-          <Button>Back to Search</Button>
-        </Link>
+      <div className="flex flex-col items-center">
+        <Skeleton className="w-32 h-32 rounded-full mb-4" />
+        <Skeleton className="h-8 w-24 mb-2" />
+        <Skeleton className="h-4 w-32" />
       </div>
     );
   }
 
-  const isLoading = isStockLoading || isScoreLoading;
-
-  // Hoisted from a nested ternary that obscured which state it rendered.
-  const quantScoreBody = isLoading ? (
-    <div className="flex flex-col items-center">
-      <Skeleton className="w-32 h-32 rounded-full mb-4" />
-      <Skeleton className="h-8 w-24 mb-2" />
-      <Skeleton className="h-4 w-32" />
-    </div>
-  ) : (
+  return (
     <>
       <div className="relative inline-flex items-center justify-center mb-4">
         <svg className="w-36 h-36 transform -rotate-90">
@@ -294,6 +270,50 @@ export default function StockScore() {
       )}
     </>
   );
+}
+
+export default function StockScore() {
+  const { ticker } = useParams<{ ticker: string }>();
+  const decodedTicker = decodeURIComponent(ticker).toUpperCase();
+
+  type ChartRange = "1m" | "6m" | "1y" | "5y";
+
+  const [chartRange, setChartRange] = useState<ChartRange>("1y");
+  const [showDetails, setShowDetails] = useState(false);
+
+  const {
+    data: stock,
+    isLoading: isStockLoading,
+    isError: isStockError,
+  } = useGetStock(decodedTicker);
+  const {
+    data: score,
+    isLoading: isScoreLoading,
+    isError: isScoreError,
+  } = useGetStockScore(decodedTicker);
+  const { data: details, isLoading: isDetailsLoading } =
+    useGetStockScoreDetails(decodedTicker, {
+      query: { enabled: showDetails },
+    });
+
+  if (isStockError || isScoreError) {
+    return (
+      <div className="flex-1 container max-w-5xl mx-auto py-8 px-4 flex flex-col items-center justify-center text-center">
+        <ShieldAlert className="w-16 h-16 text-destructive mb-4" />
+        <h2 className="text-2xl font-bold mb-2">Ticker Not Found</h2>
+        <p className="text-muted-foreground mb-6">
+          Could not find scoring data for {decodedTicker}.
+        </p>
+        <Link href="/">
+          <Button>Back to Search</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  const isLoading = isStockLoading || isScoreLoading;
+
+  const quantScoreBody = <QuantScoreDial score={score} isLoading={isLoading} />;
 
   // Hoisted from a chained ternary that hid three distinct states.
   let categoryScoresBody: React.ReactNode;

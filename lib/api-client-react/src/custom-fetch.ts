@@ -11,6 +11,7 @@ export type AuthTokenGetter = () => Promise<string | null> | string | null;
 const NO_BODY_STATUS = new Set([204, 205, 304]);
 const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 const SLASH = 47;
+const CONTENT_TYPE = "content-type";
 
 // ---------------------------------------------------------------------------
 // Module-level configuration
@@ -124,7 +125,7 @@ function mergeHeaders(...sources: Array<HeadersInit | undefined>): Headers {
 }
 
 function getMediaType(headers: Headers): string | null {
-  const value = headers.get("content-type");
+  const value = headers.get(CONTENT_TYPE);
   return value ? value.split(";", 1)[0].trim().toLowerCase() : null;
 }
 
@@ -382,10 +383,10 @@ export async function customFetch<T = unknown>(
 
   if (
     typeof init.body === "string" &&
-    !headers.has("content-type") &&
+    !headers.has(CONTENT_TYPE) &&
     looksLikeJson(init.body)
   ) {
-    headers.set("content-type", "application/json");
+    headers.set(CONTENT_TYPE, "application/json");
   }
 
   if (responseType === "json" && !headers.has("accept")) {

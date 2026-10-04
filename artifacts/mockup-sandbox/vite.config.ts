@@ -15,6 +15,18 @@ if (Number.isNaN(port) || port <= 0) {
 
 const basePath = process.env.BASE_PATH ?? "/";
 
+// See artifacts/quantstock/vite.config.ts — 0.0.0.0 bind, so Host validation
+// stays on and VITE_ALLOWED_HOSTS extends the list.
+const allowedHosts = [
+  "localhost",
+  "127.0.0.1",
+  "[::1]",
+  ...(process.env.VITE_ALLOWED_HOSTS ?? "")
+    .split(",")
+    .map((host) => host.trim())
+    .filter(Boolean),
+];
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -46,7 +58,7 @@ export default defineConfig({
   server: {
     port,
     host: "0.0.0.0",
-    allowedHosts: true,
+    allowedHosts,
     fs: {
       strict: true,
     },
@@ -54,6 +66,6 @@ export default defineConfig({
   preview: {
     port,
     host: "0.0.0.0",
-    allowedHosts: true,
+    allowedHosts,
   },
 });

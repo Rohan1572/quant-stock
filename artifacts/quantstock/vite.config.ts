@@ -15,6 +15,21 @@ if (Number.isNaN(port) || port <= 0) {
 
 const basePath = process.env.BASE_PATH ?? "/";
 
+// Keep the proxy in step with the API's own PORT; default matches its default.
+const apiPort = process.env.API_PORT ?? "5000";
+
+// The server binds 0.0.0.0, so Host validation stays on: `allowedHosts: true`
+// would let any site point its DNS here and read the app. Extend as needed.
+const allowedHosts = [
+  "localhost",
+  "127.0.0.1",
+  "[::1]",
+  ...(process.env.VITE_ALLOWED_HOSTS ?? "")
+    .split(",")
+    .map((host) => host.trim())
+    .filter(Boolean),
+];
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -57,9 +72,9 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     proxy: {
-      "/api": "http://localhost:5000",
+      "/api": `http://localhost:${apiPort}`,
     },
-    allowedHosts: true,
+    allowedHosts,
     fs: {
       strict: true,
     },
@@ -67,6 +82,6 @@ export default defineConfig({
   preview: {
     port,
     host: "0.0.0.0",
-    allowedHosts: true,
+    allowedHosts,
   },
 });

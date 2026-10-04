@@ -21,9 +21,16 @@ export default [
     plugins: { sonarjs },
     languageOptions: {
       parserOptions: {
+        // Every project the `lint` script covers must be listed here. A file
+        // outside all of them has no type information, which typescript-eslint
+        // reports as a parsing error — but only when --fix is passed, because
+        // the fix pass opens the project service differently. That made
+        // `npm run lint` pass while `npm run lint:fix` failed on lib/db/src.
         project: [
           "./artifacts/api-server/tsconfig.json",
           "./artifacts/quantstock/tsconfig.json",
+          "./lib/db/tsconfig.json",
+          "./lib/api-client-react/tsconfig.json",
         ],
         tsconfigRootDir: import.meta.dirname,
       },

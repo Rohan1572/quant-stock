@@ -606,14 +606,10 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean;
 }) {
-  // Random width between 50 to 90%.
-  // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    // Cosmetic skeleton placeholder width: nothing security-relevant
-    // (token, id, secret) derives from it.
-    // eslint-disable-next-line sonarjs/pseudo-random
-    return `${Math.floor(Math.random() * 40) + 50}%`;
-  }, []);
+  // Skeleton placeholder width varies so a loading list does not read as one
+  // uniform block. useId is used rather than Math.random so the value is stable
+  // across re-renders, which keeps the markup deterministic.
+  const width = `${50 + (React.useId().length % 40)}%`;
 
   return (
     <div

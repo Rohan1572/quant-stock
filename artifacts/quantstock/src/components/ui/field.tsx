@@ -190,13 +190,12 @@ function FieldError({
 }: React.ComponentProps<"div"> & {
   errors?: Array<{ message?: string } | undefined>;
 }) {
-  // Every branch below returns a ReactNode (children | null | string | JSX),
-  // so the return type is already uniform; SonarJS does not read the
-  // annotation on an arrow function passed to useMemo.
-  // eslint-disable-next-line sonarjs/function-return-type
-  const content = useMemo((): React.ReactNode => {
+  // Each branch returns JSX or null, so the return type is consistent. The
+  // string and children cases are wrapped in a fragment, which renders nothing
+  // itself, so the output is unchanged.
+  const content = useMemo((): React.ReactElement | null => {
     if (children) {
-      return children;
+      return <>{children}</>;
     }
 
     if (!errors) {
@@ -204,7 +203,7 @@ function FieldError({
     }
 
     if (errors?.length === 1 && errors[0]?.message) {
-      return errors[0].message;
+      return <>{errors[0].message}</>;
     }
 
     return (

@@ -10,6 +10,7 @@ export type AuthTokenGetter = () => Promise<string | null> | string | null;
 
 const NO_BODY_STATUS = new Set([204, 205, 304]);
 const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
+const SLASH = 47;
 
 // ---------------------------------------------------------------------------
 // Module-level configuration
@@ -26,7 +27,16 @@ let _authTokenGetter: AuthTokenGetter | null = null;
  * Pass `null` to clear the base URL.
  */
 export function setBaseUrl(url: string | null): void {
-  _baseUrl = url ? url.replace(/\/+$/, "") : null;
+  if (!url) {
+    _baseUrl = null;
+    return;
+  }
+  // Trailing slashes trimmed by walking backwards: `/\/+$/` is super-linear.
+  let end = url.length;
+  while (end > 0 && url.charCodeAt(end - 1) === SLASH) {
+    end -= 1;
+  }
+  _baseUrl = url.slice(0, end);
 }
 
 /**
@@ -70,6 +80,18 @@ function applyBaseUrl(input: RequestInfo | URL): RequestInfo | URL {
   if (!url.startsWith("/")) return input;
 
   const absolute = `${_baseUrl}${url}`;
+  return rebuildInput(input, absolute);
+}
+
+// Returns the same kind of object it was given (string in, string out, and so
+// on) because callers such as `resolveMethod` and `resolveUrl` branch on that
+// exact type afterwards. One return type would mean always allocating a Request,
+// copying body/metadata on every request.
+// eslint-disable-next-line sonarjs/function-return-type
+function rebuildInput(
+  input: RequestInfo | URL,
+  absolute: string,
+): RequestInfo | URL {
   if (typeof input === "string") return absolute;
   if (isUrl(input)) return new URL(absolute);
   return new Request(absolute, input as Request);

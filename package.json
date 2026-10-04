@@ -23,7 +23,7 @@
     "db:migrate": "npm run --workspace=@workspace/db migrate",
     "db:migrate:down": "npm run --workspace=@workspace/db migrate:down",
     "clean": "node -e \"const fs=require('fs'),p=require('path');for(const w of ['artifacts/api-server','artifacts/mockup-sandbox','artifacts/quantstock','lib/api-client-react','lib/api-zod','lib/db','scripts'])for(const f of ['dist','.tsbuildinfo','tsconfig.tsbuildinfo'])fs.rmSync(p.join(w,f),{recursive:true,force:true});\"",
-    "reinstall": "node -e \"const fs=require('fs');for(const p of ['node_modules','package-lock.json','.package-lock.json'])fs.rmSync(p,{recursive:true,force:true});\" && npm cache clean --force && npm i"
+    "reinstall": "node ./scripts/reset-install.mjs && npm install"
   },
   "workspaces": [
     "artifacts/*",

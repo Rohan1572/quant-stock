@@ -34,6 +34,11 @@ jobs:
       - name: Audit dependencies
         run: npm run audit:deps
 
+      # Fails on any new advisory. Advisories with no patched release are listed
+      # with their justification in scripts/audit-vulnerabilities.mjs.
+      - name: Audit vulnerabilities
+        run: npm run audit:vulns
+
       - name: Typecheck
         run: npm run typecheck
 

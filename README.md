@@ -116,6 +116,23 @@ Check that every workspace declares what it imports:
 npm run audit:deps
 ```
 
+Check for new dependency vulnerabilities:
+
+```powershell
+npm run audit:vulns
+```
+
+This fails on any advisory that is not listed, with its justification, in
+`scripts/audit-vulnerabilities.mjs`. It currently carries one entry: a
+high-severity `braces` stack-exhaustion advisory (CVE-2026-93687) reached
+through `fast-glob` in the mockup sandbox. No patched `braces` exists —
+3.0.3 is the latest release — so there is nothing to upgrade to. It is
+accepted because the only pattern that reaches it is a literal in
+`mockupPreviewPlugin.ts`, never user input, and `braces` rejects input over
+1000 characters, which bounds nesting depth below the overflow threshold. The
+entry fails once the advisory is no longer reported, so it gets revisited when
+a fix ships.
+
 Build everything:
 
 ```powershell

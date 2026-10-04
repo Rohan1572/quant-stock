@@ -40,6 +40,15 @@ export function mockupPreviewPlugin(): Plugin {
   }
 
   async function discoverComponents(): Promise<Array<DiscoveredComponent>> {
+    // The pattern is a literal from this file, never user input. That matters
+    // because npm audit flags a high-severity braces advisory (CVE-2026-93687)
+    // reachable through fast-glob -> micromatch -> braces: deeply nested brace
+    // patterns can exhaust the stack in braces' recursive walkers. No patched
+    // braces exists (3.0.3 is the latest release), so there is nothing to
+    // upgrade to, and braces already rejects input over 1000 characters, which
+    // caps reachable nesting depth below anything that overflows. This is the
+    // one advisory `npm run audit:vulns` allows; do not make this pattern
+    // dynamic without revisiting that.
     const files = await glob(`${MOCKUPS_DIR}/**/*.tsx`, {
       cwd: root,
       ignore: ["**/_*/**", "**/_*.tsx"],

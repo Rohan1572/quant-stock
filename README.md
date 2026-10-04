@@ -182,7 +182,7 @@ check whether an upstream package moved before suspecting the code.
 - `lib/api-client-react/` — generated React API client
 - `lib/api-zod/` — generated Zod schemas
 - `lib/db/` — Drizzle schema and migrations setup
-- `scripts/` — workspace helper scripts
+- `scripts/` — repository tooling: the dependency and vulnerability audits, and the post-merge hook
 
 ## Scoring model
 

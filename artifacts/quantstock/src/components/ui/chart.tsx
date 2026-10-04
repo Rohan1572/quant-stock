@@ -293,14 +293,16 @@ const ChartLegend = RechartsPrimitive.Legend;
 
 const ChartLegendContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<"div"> &
-    Pick<RechartsPrimitive.LegendProps, "payload"> & {
-      /** Recharts deprecates this on LegendProps; the literal union is
-       *  equivalent and keeps this component off a deprecated type. */
-      verticalAlign?: "top" | "middle" | "bottom";
-      hideIcon?: boolean;
-      nameKey?: string;
-    }
+  React.ComponentProps<"div"> & {
+    // Declared here rather than picked from RechartsPrimitive.LegendProps:
+    // recharts omits `payload`, `ref` and `verticalAlign` from that type
+    // (Omit<DefaultLegendContentProps, 'payload' | 'ref' | ...>), so picking
+    // them off it does not compile and silently resolves to `{}`.
+    payload?: ChartTooltipPayloadItem[];
+    verticalAlign?: "top" | "middle" | "bottom";
+    hideIcon?: boolean;
+    nameKey?: string;
+  }
 >(
   (
     { className, hideIcon = false, payload, verticalAlign = "bottom", nameKey },

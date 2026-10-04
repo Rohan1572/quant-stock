@@ -1,7 +1,8 @@
 import { createRequire } from "node:module";
 import path from "node:path";
+import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { build as esbuild } from "esbuild";
+import { build as esbuild, context as esbuildContext } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
 import { rm } from "node:fs/promises";
 
@@ -9,12 +10,11 @@ import { rm } from "node:fs/promises";
 globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
+const isWatch = process.argv.includes("--watch");
 
-async function buildAll() {
-  const distDir = path.resolve(artifactDir, "dist");
-  await rm(distDir, { recursive: true, force: true });
-
-  await esbuild({
+// Shared by both paths so they always compile the same thing.
+function buildOptions() {
+  return {
     entryPoints: [path.resolve(artifactDir, "src/index.ts")],
     platform: "node",
     bundle: true,
@@ -117,10 +117,81 @@ globalThis.__filename = __bannerUrl.fileURLToPath(import.meta.url);
 globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
-  });
+  };
 }
 
-buildAll().catch((err) => {
+const distDir = path.resolve(artifactDir, "dist");
+
+async function buildAll() {
+  await rm(distDir, { recursive: true, force: true });
+  await esbuild(buildOptions());
+}
+
+// Restart after each successful rebuild. onEnd skips builds with errors, so a
+// syntax error leaves the last working server up.
+async function watchAll() {
+  let child = null;
+  let stopping = false;
+
+  const stop = () => {
+    if (child && child.exitCode === null) {
+      child.kill();
+      child = null;
+    }
+  };
+
+  const start = () => {
+    stop();
+    child = spawn(
+      process.execPath,
+      [
+        "--enable-source-maps",
+        "--env-file-if-exists=../../.env",
+        "./dist/index.mjs",
+      ],
+      { cwd: artifactDir, stdio: "inherit" },
+    );
+    child.on("exit", (code, signal) => {
+      if (stopping) return;
+      if (signal) console.error(`server exited (${signal})`);
+      process.exitCode = code ?? 0;
+    });
+  };
+
+  const restartPlugin = {
+    name: "restart-server",
+    setup(build) {
+      let first = true;
+      build.onEnd((result) => {
+        if (result.errors.length > 0) return;
+        // watch() does the initial build before it resolves; start() covers that.
+        if (first) {
+          first = false;
+          return;
+        }
+        start();
+      });
+    },
+  };
+
+  const ctx = await esbuildContext({
+    ...buildOptions(),
+    plugins: [...buildOptions().plugins, restartPlugin],
+  });
+  await ctx.watch();
+  start();
+
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    process.on(signal, () => {
+      stopping = true;
+      stop();
+      void ctx.dispose().then(() => process.exit(0));
+    });
+  }
+}
+
+const run = isWatch ? watchAll : buildAll;
+run().catch((err) => {
   console.error(err);
   process.exit(1);
 });

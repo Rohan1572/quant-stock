@@ -8,16 +8,21 @@
     "dev:mockup": "npm run --workspace=@workspace/mockup-sandbox dev",
     "build": "npm run typecheck && npm run build:apps",
     "build:apps": "npm run --workspaces --if-present build",
-    "codegen": "npm run --workspace=@workspace/api-spec codegen",
-    "reinstall": "node -e \"const fs=require('fs');for(const p of ['node_modules','package-lock.json','.package-lock.json'])fs.rmSync(p,{recursive:true,force:true});\" && npm cache clean --force && npm i",
-    "typecheck:libs": "tsc --build",
+    "verify": "npm run audit:deps && npm run typecheck && npm run test && npm run lint && npm run format:check && npm run build:apps",
     "typecheck": "npm run typecheck:libs && npm run typecheck:apps",
-    "audit:deps": "node ./scripts/audit-dependencies.mjs",
-    "test": "npm run --workspaces --if-present test",
+    "typecheck:libs": "tsc --build",
     "typecheck:apps": "npm run --workspaces --if-present typecheck",
-    "lint": "eslint -c eslint.sonar.config.mjs artifacts/api-server/src artifacts/quantstock/src lib/db/src lib/api-spec/orval.config.ts",
+    "test": "npm run --workspaces --if-present test",
+    "lint": "eslint -c eslint.sonar.config.mjs artifacts/api-server/src artifacts/quantstock/src lib/db/src lib/api-client-react/src lib/api-spec/orval.config.ts",
+    "lint:fix": "npm run lint -- --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "audit:deps": "node ./scripts/audit-dependencies.mjs",
+    "codegen": "npm run --workspace=@workspace/api-spec codegen",
+    "db:migrate": "npm run --workspace=@workspace/db migrate",
+    "db:migrate:down": "npm run --workspace=@workspace/db migrate:down",
+    "clean": "node -e \"const fs=require('fs'),p=require('path');for(const w of ['artifacts/api-server','artifacts/mockup-sandbox','artifacts/quantstock','lib/api-client-react','lib/api-zod','lib/db','scripts'])for(const f of ['dist','.tsbuildinfo','tsconfig.tsbuildinfo'])fs.rmSync(p.join(w,f),{recursive:true,force:true});\"",
+    "reinstall": "node -e \"const fs=require('fs');for(const p of ['node_modules','package-lock.json','.package-lock.json'])fs.rmSync(p,{recursive:true,force:true});\" && npm cache clean --force && npm i"
   },
   "workspaces": [
     "artifacts/*",
@@ -25,11 +30,6 @@
     "scripts"
   ],
   "private": true,
-  "dependencies": {
-    "@floating-ui/react-dom": "2.1.9",
-    "@replit/connectors-sdk": "0.4.1",
-    "regexparam": "3.0.0"
-  },
   "devDependencies": {
     "@eslint/js": "9.18.0",
     "eslint": "9.18.0",

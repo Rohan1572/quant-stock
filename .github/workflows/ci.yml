@@ -16,10 +16,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No setup-node cache: it hashes the dependency tree from a lockfile and
+      # errors when none is present. It only speeds up installs.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
 
       - name: Install
         # npm install, not npm ci: package-lock.json is deliberately untracked so
@@ -72,7 +73,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
 
       - name: Install
         run: npm install

@@ -12,8 +12,10 @@ type CarouselOptions = UseCarouselParameters[0];
 type CarouselPlugin = UseCarouselParameters[1];
 
 type CarouselProps = {
-  opts?: CarouselOptions;
-  plugins?: CarouselPlugin;
+  // NonNullable: the embla parameter types already include `undefined`, so `?`
+  // read as redundant to the linter but is what keeps these optional.
+  opts?: NonNullable<CarouselOptions>;
+  plugins?: NonNullable<CarouselPlugin>;
   orientation?: "horizontal" | "vertical";
   setApi?: (api: CarouselApi) => void;
 };

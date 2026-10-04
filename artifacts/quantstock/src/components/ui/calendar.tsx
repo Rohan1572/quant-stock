@@ -20,7 +20,9 @@ function Calendar({
   components,
   ...props
 }: React.ComponentProps<typeof DayPicker> & {
-  buttonVariant?: React.ComponentProps<typeof Button>["variant"];
+  // NonNullable: the type already includes `undefined`, so `?` read as redundant
+  // to the linter but is what keeps this optional.
+  buttonVariant?: NonNullable<React.ComponentProps<typeof Button>["variant"]>;
 }) {
   const defaultClassNames = getDefaultClassNames();
 

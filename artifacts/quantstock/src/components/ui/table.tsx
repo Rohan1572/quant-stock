@@ -7,8 +7,6 @@ const Table = React.forwardRef<
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
   <div className="relative w-full overflow-auto">
-    {/* eslint-disable-next-line sonarjs/table-header -- unstyled table
-        primitive; callers compose TableHeader/TableBody themselves. */}
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}

@@ -47,7 +47,8 @@ jobs:
         run: npm run format:check
 
       - name: Build
-        run: npm run build
+        # build:apps, not build: typecheck already ran above.
+        run: npm run build:apps
 
   migrations:
     # Migrations only mean something against a real Postgres, and a broken one

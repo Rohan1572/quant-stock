@@ -33,10 +33,10 @@ $env:DATABASE_URL="postgresql://postgres:postgres@localhost:5432/quantstock"
 
 ## 3. Database setup
 
-Create the `quantstock` PostgreSQL database before starting the API server. Database migration commands are available from the database workspace:
+Create the `quantstock` PostgreSQL database before starting the API server. Database migration commands are available from the repository root:
 
 ```powershell
-npm run --workspace=@workspace/db migrate
+npm run db:migrate
 ```
 
 ## 4. Run the app locally
@@ -47,7 +47,7 @@ Start the API server first in a separate PowerShell terminal. Set the variables 
 npm run dev:api
 ```
 
-The API server listens on `http://localhost:5000`. The frontend development server proxies `/api` requests to it.
+The API server watches its sources and the libraries it bundles, recompiling and restarting on save. A build error is reported but leaves the last working server running. It listens on `http://localhost:5000`; the frontend dev server proxies `/api` to it.
 
 ### Frontend app
 
@@ -97,6 +97,12 @@ without needing a server):
 npm run lint
 ```
 
+Apply the fixes ESLint can make automatically:
+
+```powershell
+npm run lint:fix
+```
+
 Check or apply formatting (Prettier; generated code is ignored):
 
 ```powershell
@@ -114,6 +120,19 @@ Build everything:
 
 ```powershell
 npm run build
+```
+
+Run every CI check in one go, in the same order CI uses:
+
+```powershell
+npm run verify
+```
+
+Discard all build output. `dist/` and the `.tsbuildinfo` files must go together —
+leaving the latter makes `tsc --build` trust stale state and skip emitting:
+
+```powershell
+npm run clean
 ```
 
 ## Continuous integration
@@ -162,3 +181,6 @@ that have already caused wrong results.
 - If npm reports missing native modules during the install or build, run `npm run reinstall` from the repo root.
 - If the API server fails before startup, verify that `DATABASE_URL` is set correctly.
 - If the Vite dev server does not start as expected, confirm that `PORT` and `BASE_PATH` are set or use the defaults already configured in the Vite files.
+- If the dev server returns "Blocked request" — or won't load from another device on the LAN — the hostname isn't in the Host allowlist. Add it to `VITE_ALLOWED_HOSTS` in `.env`.
+- If the frontend can't reach `/api`, keep `API_PORT` (default `5000`) in step with the API's `PORT`.
+- If the browser blocks an API response, the origin isn't in the CORS allowlist. Add it to `CORS_ORIGINS` in `.env`.

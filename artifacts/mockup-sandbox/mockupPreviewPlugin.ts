@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
+import { glob } from "node:fs/promises";
 import path from "node:path";
-import glob from "fast-glob";
 import chokidar from "chokidar";
 import type { FSWatcher } from "chokidar";
 import type { Plugin } from "vite";
@@ -40,21 +40,26 @@ export function mockupPreviewPlugin(): Plugin {
   }
 
   async function discoverComponents(): Promise<Array<DiscoveredComponent>> {
-    // The pattern is a literal from this file, never user input. That matters
-    // because npm audit flags a high-severity braces advisory (CVE-2026-93687)
-    // reachable through fast-glob -> micromatch -> braces: deeply nested brace
-    // patterns can exhaust the stack in braces' recursive walkers. No patched
-    // braces exists (3.0.3 is the latest release), so there is nothing to
-    // upgrade to, and braces already rejects input over 1000 characters, which
-    // caps reachable nesting depth below anything that overflows. This is the
-    // one advisory `npm run audit:vulns` allows; do not make this pattern
-    // dynamic without revisiting that.
-    const files = await glob(`${MOCKUPS_DIR}/**/*.tsx`, {
+    // Uses node's built-in glob rather than fast-glob, whose micromatch -> braces
+    // dependency carries CVE-2026-93687 with no patched release available.
+    // It yields an async iterator, so it is drained with for-await; that avoids
+    // Array.fromAsync, which this package's es2022 lib target does not declare.
+    // Paths come back platform-separated, so they are normalised to POSIX
+    // before being used as import specifiers and glob keys. Sorted so the
+    // generated module is stable across filesystems.
+    const found: string[] = [];
+    for await (const entry of glob(`${MOCKUPS_DIR}/**/*.tsx`, {
       cwd: root,
-      ignore: ["**/_*/**", "**/_*.tsx"],
-    });
+      // Underscore-prefixed files and directories are opted out of preview.
+      exclude: (candidate) =>
+        candidate
+          .split(path.sep)
+          .some((segment) => segment.startsWith("_")),
+    })) {
+      found.push(entry.split(path.sep).join("/"));
+    }
 
-    return files.map((f) => ({
+    return found.sort().map((f) => ({
       globKey: "./" + f.slice("src/".length),
       importPath: path.posix.relative("src/.generated", f),
     }));

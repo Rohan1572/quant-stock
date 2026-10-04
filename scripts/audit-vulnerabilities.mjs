@@ -1,10 +1,13 @@
 /**
  * Fails on any npm audit advisory except the ones explicitly accepted below.
  *
- * `npm audit fix` cannot help when no patched release exists, and a permanently
- * red audit train gets ignored. So each accepted advisory is listed with the
- * reason it is tolerable, and anything new — a fresh CVE, a new transitive, a
- * severity change — still fails the build.
+ * `npm audit fix` cannot always help — some advisories have no patched release
+ * at all — and a permanently red audit train just gets ignored. So each accepted
+ * advisory is listed with the reason it is tolerable, and anything new — a fresh
+ * CVE, a new transitive, a severity change — still fails the build. An accepted
+ * entry that is no longer reported also fails, so it cannot outlive its problem.
+ *
+ * Currently empty: `npm audit` reports zero advisories.
  *
  * Run with `npm run audit:vulns`.
  */
@@ -13,35 +16,13 @@ import { execFileSync } from "node:child_process";
 /**
  * Advisory -> why it is accepted. Delete an entry once a fix ships, or once the
  * dependency is no longer reachable, and the audit goes back to failing on it.
+ *
+ * Empty, because nothing is accepted today: `npm audit` reports zero
+ * advisories. The mechanism stays so a future unfixable one is a reviewed
+ * decision with a written justification rather than a silent pass, and so the
+ * stale check keeps accepted entries from outliving the problem.
  */
-const ACCEPTED = {
-  braces: {
-    advisory: "GHSA-vfj7-8cjw-p6xm / CVE-2026-93687",
-    reason:
-      "Root of the advisory: stack exhaustion via deeply nested brace " +
-      "patterns in braces' recursive walkers. Reached through fast-glob -> " +
-      "micromatch in @workspace/mockup-sandbox, which passes exactly one " +
-      "pattern: the literal 'src/components/mockups/**/*.tsx' in " +
-      "mockupPreviewPlugin.ts. That is developer-authored source, never user " +
-      "input, and braces caps input at 1000 characters, bounding nesting " +
-      "depth below the overflow threshold. No patched braces exists (3.0.3 is " +
-      "latest). Revisit when one ships.",
-  },
-  // npm audit reports the whole path, so the two intermediates appear as their
-  // own entries. Neither carries an independent finding — dropping either
-  // drops braces too — so they inherit its justification.
-  micromatch: {
-    advisory: "GHSA-vfj7-8cjw-p6xm via braces",
-    reason: "Intermediary in the braces advisory. See the braces entry.",
-  },
-  "fast-glob": {
-    advisory: "GHSA-vfj7-8cjw-p6xm via micromatch",
-    reason:
-      "Intermediary in the braces advisory, declared directly by " +
-      "@workspace/mockup-sandbox. See the braces entry for why the reachable " +
-      "input is a developer-authored literal rather than user input.",
-  },
-};
+const ACCEPTED = {};
 
 function auditJson() {
   // npm audit exits non-zero when it finds anything, which is the normal path

@@ -122,16 +122,14 @@ Check for new dependency vulnerabilities:
 npm run audit:vulns
 ```
 
-This fails on any advisory that is not listed, with its justification, in
-`scripts/audit-vulnerabilities.mjs`. It currently carries one entry: a
-high-severity `braces` stack-exhaustion advisory (CVE-2026-93687) reached
-through `fast-glob` in the mockup sandbox. No patched `braces` exists —
-3.0.3 is the latest release — so there is nothing to upgrade to. It is
-accepted because the only pattern that reaches it is a literal in
-`mockupPreviewPlugin.ts`, never user input, and `braces` rejects input over
-1000 characters, which bounds nesting depth below the overflow threshold. The
-entry fails once the advisory is no longer reported, so it gets revisited when
-a fix ships.
+This fails on any known advisory. Ones with no patched release would have to be
+listed, with a justification, in `scripts/audit-vulnerabilities.mjs`; that list is
+currently empty, since `npm audit` reports zero advisories.
+
+It replaced `fast-glob` in the mockup sandbox, which was the only route to a
+high-severity `braces` stack-exhaustion advisory (CVE-2026-93687) with no
+patched release — `node:fs`'s built-in glob does the same job and removed
+`fast-glob`, `micromatch` and `braces` from the tree entirely.
 
 Build everything:
 

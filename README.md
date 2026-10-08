@@ -137,6 +137,16 @@ Build everything:
 npm run build
 ```
 
+The API bundle is minified by default, with linked source maps retained. To
+inspect which inputs contribute to it, run the build with `ANALYZE_BUNDLE=1`
+set. In PowerShell:
+
+```powershell
+$env:ANALYZE_BUNDLE="1"
+npm run --workspace=@workspace/api-server build
+Remove-Item Env:ANALYZE_BUNDLE
+```
+
 Run every CI check in one go, in the same order CI uses:
 
 ```powershell

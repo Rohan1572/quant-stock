@@ -18,6 +18,7 @@ function buildOptions() {
     entryPoints: [path.resolve(artifactDir, "src/index.ts")],
     platform: "node",
     bundle: true,
+    minify: true,
     format: "esm",
     outdir: distDir,
     outExtension: { ".js": ".mjs" },
@@ -124,7 +125,31 @@ const distDir = path.resolve(artifactDir, "dist");
 
 async function buildAll() {
   await rm(distDir, { recursive: true, force: true });
-  await esbuild(buildOptions());
+  const analyze = process.env["ANALYZE_BUNDLE"] === "1";
+  const result = await esbuild({
+    ...buildOptions(),
+    ...(analyze ? { metafile: true } : {}),
+  });
+  if (analyze && result.metafile) {
+    const bundle = Object.values(result.metafile.outputs).find((output) =>
+      output.entryPoint?.endsWith("src/index.ts"),
+    );
+    if (!bundle) {
+      throw new Error("Could not find the API entrypoint in the build output.");
+    }
+
+    const inputs = Object.entries(bundle.inputs)
+      .sort((a, b) => b[1].bytesInOutput - a[1].bytesInOutput)
+      .slice(0, 15);
+    console.log("Largest API bundle inputs:");
+    for (const [input, details] of inputs) {
+      const sizeKb = details.bytesInOutput / 1000;
+      const percent = (details.bytesInOutput / bundle.bytes) * 100;
+      console.log(
+        `  ${sizeKb.toFixed(1).padStart(7)} kB  ${percent.toFixed(1).padStart(5)}%  ${input}`,
+      );
+    }
+  }
 }
 
 // Restart after each successful rebuild. onEnd skips builds with errors, so a

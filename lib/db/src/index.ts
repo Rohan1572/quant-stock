@@ -20,7 +20,7 @@ async function ensureDatabaseMigrations() {
   try {
     await runner({
       dbClient: client,
-      dir: fileURLToPath(new URL("../migrations", import.meta.url)),
+      dir: fileURLToPath(new URL("./migrations", import.meta.url)),
       direction: "up",
       count: Number.POSITIVE_INFINITY,
       migrationsTable: "pgmigrations",

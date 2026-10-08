@@ -1,0 +1,39 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "api-server": {
+      "root": "artifacts/api-server",
+      "framework": "express",
+      "entrypoint": "src/app.ts"
+    },
+    "mockup-sandbox": {
+      "root": "artifacts/mockup-sandbox",
+      "framework": "vite"
+    },
+    "quantstock": {
+      "root": "artifacts/quantstock",
+      "framework": "vite",
+      "outputDirectory": "dist/public"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "api-server"
+      }
+    },
+    {
+      "source": "/preview/(.*)",
+      "destination": {
+        "service": "mockup-sandbox"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "quantstock"
+      }
+    }
+  ]
+}

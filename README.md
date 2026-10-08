@@ -33,7 +33,7 @@ $env:DATABASE_URL="postgresql://postgres:postgres@localhost:5432/quantstock"
 
 ## 3. Database setup
 
-Create the `quantstock` PostgreSQL database before starting the API server. Database migration commands are available from the repository root:
+Create the `quantstock` PostgreSQL database before starting the API server. The API bootstraps the required migration state automatically on first connect, and the explicit migration command is still available from the repository root:
 
 ```powershell
 npm run db:migrate

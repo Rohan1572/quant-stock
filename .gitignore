@@ -54,6 +54,6 @@ Thumbs.db
 # Copilot / Agent files
 .agents/memory/
 
-# Replit
+# Local caches
 .cache/
 .local/

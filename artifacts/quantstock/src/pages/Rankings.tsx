@@ -164,6 +164,7 @@ export default function Rankings() {
       setCooldownMsg(null);
       return;
     }
+    setCooldownMsg(`Available ${formatNextRefresh(data.nextRefreshAt)}`);
     const t = setTimeout(() => setCooldownMsg(null), ms);
     return () => clearTimeout(t);
   }, [data?.nextRefreshAt]);
@@ -179,8 +180,9 @@ export default function Rankings() {
             ? formatNextRefresh(result.nextRefreshAt)
             : "soon";
           setCooldownMsg(`Available ${next}`);
+          void refetch();
         } else {
-          refetch();
+          void refetch();
         }
       },
     });

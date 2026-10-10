@@ -8,15 +8,26 @@ import { logger } from "../logger";
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+const REQUEST_TIMEOUT_MS = 20_000;
 
 let cachedCookie: string | null = null;
 let cachedCrumb: string | null = null;
 let crumbFetchedAt = 0;
 const CRUMB_TTL_MS = 30 * 60 * 1000;
 
+function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  return fetch(url, {
+    ...init,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+}
+
 async function refreshCrumb(): Promise<{ cookie: string; crumb: string }> {
   // Step 1: hit a Yahoo endpoint to collect session cookies.
-  const cookieRes = await fetch("https://fc.yahoo.com", {
+  const cookieRes = await fetchWithTimeout("https://fc.yahoo.com", {
     headers: { "User-Agent": USER_AGENT },
     redirect: "manual",
   });
@@ -24,7 +35,7 @@ async function refreshCrumb(): Promise<{ cookie: string; crumb: string }> {
   const cookie = setCookie ? setCookie.split(";")[0] : "";
 
   // Step 2: exchange the cookie for a crumb.
-  const crumbRes = await fetch(
+  const crumbRes = await fetchWithTimeout(
     "https://query1.finance.yahoo.com/v1/test/getcrumb",
     {
       headers: {
@@ -53,7 +64,7 @@ async function getCrumb(): Promise<{ cookie: string; crumb: string }> {
 }
 
 async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
   });
   if (!res.ok) {
@@ -69,7 +80,7 @@ async function fetchJsonWithCrumb(
   const attempt = async (): Promise<Response> => {
     const { cookie, crumb } = await getCrumb();
     const qs = new URLSearchParams({ ...params, crumb });
-    const res = await fetch(`${baseUrl}?${qs.toString()}`, {
+    const res = await fetchWithTimeout(`${baseUrl}?${qs.toString()}`, {
       headers: {
         "User-Agent": USER_AGENT,
         Accept: "application/json",

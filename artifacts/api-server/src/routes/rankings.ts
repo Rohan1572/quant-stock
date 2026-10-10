@@ -13,19 +13,23 @@ const router: IRouter = Router();
 
 // ── Refresh rate-limiting (in-memory; resets on server restart) ───────────
 const REFRESH_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+const PARTIAL_REFRESH_RETRY_DELAY_MS = 5 * 60 * 1000; // 5 minutes
 const SCORE_BATCH_SIZE = 5;
 const SCORE_BATCH_DELAY_MS = 300; // ms between batches — be gentle with Yahoo
 
 let lastRefreshAt: Date | null = null;
+let retryAvailableAt: Date | null = null;
 let isRefreshing = false;
 
 function nextRefreshAt(): Date | null {
+  if (retryAvailableAt) return retryAvailableAt;
   if (!lastRefreshAt) return null;
   return new Date(lastRefreshAt.getTime() + REFRESH_COOLDOWN_MS);
 }
 
 function canRefresh(): boolean {
   if (isRefreshing) return false;
+  if (retryAvailableAt) return Date.now() >= retryAvailableAt.getTime();
   if (!lastRefreshAt) return true;
   return Date.now() - lastRefreshAt.getTime() >= REFRESH_COOLDOWN_MS;
 }
@@ -33,36 +37,61 @@ function canRefresh(): boolean {
 // ── Background scoring job ────────────────────────────────────────────────
 async function scoreAllInBackground(): Promise<void> {
   isRefreshing = true;
-  logger.info({ tickers: WATCHLIST.length }, "Rankings refresh started");
-  let succeeded = 0;
-  let failed = 0;
+  try {
+    logger.info({ tickers: WATCHLIST.length }, "Rankings refresh started");
+    let succeeded = 0;
+    let failed = 0;
 
-  const tickers = WATCHLIST.map((e) => e.ticker);
-  for (let i = 0; i < tickers.length; i += SCORE_BATCH_SIZE) {
-    const batch = tickers.slice(i, i + SCORE_BATCH_SIZE);
-    await Promise.all(
-      batch.map(async (ticker) => {
-        try {
-          await getScore(ticker);
-          succeeded++;
-        } catch (err) {
-          if (err instanceof TickerNotFoundError) {
-            // ticker delisted or not on Yahoo — skip silently
-          } else {
-            logger.warn({ err, ticker }, "Rankings: failed to score ticker");
-          }
-          failed++;
-        }
-      }),
+    const tickers = WATCHLIST.map((e) => e.ticker);
+    const batches = Array.from(
+      { length: Math.ceil(tickers.length / SCORE_BATCH_SIZE) },
+      (_, index) =>
+        tickers.slice(index * SCORE_BATCH_SIZE, (index + 1) * SCORE_BATCH_SIZE),
     );
-    if (i + SCORE_BATCH_SIZE < tickers.length) {
-      await new Promise((r) => setTimeout(r, SCORE_BATCH_DELAY_MS));
-    }
-  }
+    await batches.reduce(
+      (previousBatch, batch, index) =>
+        previousBatch.then(async () => {
+          await Promise.all(
+            batch.map(async (ticker) => {
+              try {
+                await getScore(ticker);
+                succeeded++;
+              } catch (err) {
+                if (err instanceof TickerNotFoundError) {
+                  // ticker delisted or not on Yahoo — skip silently
+                } else {
+                  logger.warn(
+                    { err, ticker },
+                    "Rankings: failed to score ticker",
+                  );
+                }
+                failed++;
+              }
+            }),
+          );
+          if (index < batches.length - 1) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, SCORE_BATCH_DELAY_MS),
+            );
+          }
+        }),
+      Promise.resolve(),
+    );
 
-  lastRefreshAt = new Date();
-  isRefreshing = false;
-  logger.info({ succeeded, failed }, "Rankings refresh complete");
+    if (failed === 0) {
+      lastRefreshAt = new Date();
+      retryAvailableAt = null;
+      logger.info({ succeeded, failed }, "Rankings refresh complete");
+    } else {
+      retryAvailableAt = new Date(Date.now() + PARTIAL_REFRESH_RETRY_DELAY_MS);
+      logger.warn(
+        { succeeded, failed, retryAvailableAt },
+        "Rankings refresh partially complete; failed tickers can be retried",
+      );
+    }
+  } finally {
+    isRefreshing = false;
+  }
 }
 
 // ── Routes ────────────────────────────────────────────────────────────────
@@ -125,7 +154,7 @@ router.get("/rankings", async (_req, res): Promise<void> => {
   );
 });
 
-router.post("/rankings/refresh", async (_req, res): Promise<void> => {
+router.post("/rankings/refresh", (_req, res): void => {
   if (!canRefresh()) {
     const next = nextRefreshAt();
     res.json(

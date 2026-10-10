@@ -10,7 +10,6 @@ export type AuthTokenGetter = () => Promise<string | null> | string | null;
 
 const NO_BODY_STATUS = new Set([204, 205, 304]);
 const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
-const SLASH = 47;
 const CONTENT_TYPE = "content-type";
 
 // ---------------------------------------------------------------------------
@@ -34,7 +33,7 @@ export function setBaseUrl(url: string | null): void {
   }
   // Trailing slashes trimmed by walking backwards: `/\/+$/` is super-linear.
   let end = url.length;
-  while (end > 0 && url.charCodeAt(end - 1) === SLASH) {
+  while (end > 0 && url.codePointAt(end - 1) === 47) {
     end -= 1;
   }
   _baseUrl = url.slice(0, end);
@@ -89,9 +88,8 @@ function applyBaseUrl(input: RequestInfo | URL): RequestInfo | URL {
 // type afterwards. One return type would mean always allocating a Request,
 // copying body/metadata on every request.
 //
-// A single exit keeps that polymorphism without tripping
-// sonarjs/function-return-type, which flags the several-returns-per-branch
-// shape. isRequest narrows the type, so the `as Request` cast is unneeded.
+// A single exit keeps that polymorphism without allocating a Request for every
+// input. isRequest narrows the type, so the `as Request` cast is unneeded.
 function rebuildInput(
   input: RequestInfo | URL,
   absolute: string,
@@ -162,7 +160,7 @@ function hasNoBody(response: Response, method: string): boolean {
 }
 
 function stripBom(text: string): string {
-  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  return text.codePointAt(0) === 0xfeff ? text.slice(1) : text;
 }
 
 function looksLikeJson(text: string): boolean {

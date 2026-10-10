@@ -54,9 +54,10 @@ export function logRatioScore(
   if (
     !Number.isFinite(value) ||
     !Number.isFinite(benchmark) ||
-    !(value > 0) ||
-    !(benchmark > 0) ||
-    !(dispersion > 0)
+    value <= 0 ||
+    benchmark <= 0 ||
+    dispersion <= 0 ||
+    Number.isNaN(dispersion)
   ) {
     return INVALID_SCORE;
   }
@@ -78,7 +79,8 @@ export function linearScore(
   if (
     !Number.isFinite(value) ||
     !Number.isFinite(benchmark) ||
-    !(dispersion > 0)
+    dispersion <= 0 ||
+    Number.isNaN(dispersion)
   ) {
     return INVALID_SCORE;
   }
@@ -101,7 +103,7 @@ export function weightedMean(items: WeightedScore[]): number {
   let den = 0;
   for (const item of items) {
     if (!Number.isFinite(item.score)) continue;
-    if (!(item.weight > 0)) continue;
+    if (item.weight <= 0 || Number.isNaN(item.weight)) continue;
     num += item.score * item.weight;
     den += item.weight;
   }
@@ -114,7 +116,7 @@ export function coverage(items: WeightedScore[]): number {
   let available = 0;
   let total = 0;
   for (const item of items) {
-    if (!(item.weight > 0)) continue;
+    if (item.weight <= 0 || Number.isNaN(item.weight)) continue;
     total += item.weight;
     if (Number.isFinite(item.score)) available += item.weight;
   }
@@ -177,7 +179,9 @@ export function realisedVolatility(closes: number[]): number | null {
   for (let i = 1; i < closes.length; i++) {
     const prev = closes[i - 1];
     const curr = closes[i];
-    if (!(prev > 0) || !(curr > 0)) continue;
+    if (prev <= 0 || curr <= 0 || Number.isNaN(prev) || Number.isNaN(curr)) {
+      continue;
+    }
     returns.push(Math.log(curr / prev));
   }
   if (returns.length < 19) return null;
@@ -194,7 +198,7 @@ export function maxDrawdown(closes: number[]): number | null {
   let worst = 0;
   for (const close of closes) {
     if (close > peak) peak = close;
-    if (!(peak > 0)) continue;
+    if (peak <= 0 || Number.isNaN(peak)) continue;
     const dd = (close - peak) / peak;
     if (dd < worst) worst = dd;
   }

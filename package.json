@@ -8,7 +8,8 @@
     "dev:mockup": "npm run --workspace=@workspace/mockup-sandbox dev",
     "build": "npm run typecheck && npm run build:apps",
     "build:apps": "npm run --workspaces --if-present build",
-    "verify": "npm run audit:deps && npm run audit:vulns && npm run typecheck && npm run test && npm run lint && npm run format:check && npm run build:apps",
+    "prepare": "husky",
+    "verify": "npm run audit:deps && npm audit && npm run typecheck && npm run test && npm run lint && npm run format:check && npm run build:apps",
     "typecheck": "npm run typecheck:libs && npm run typecheck:apps",
     "typecheck:libs": "tsc --build",
     "typecheck:apps": "npm run --workspaces --if-present typecheck",
@@ -18,7 +19,6 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "audit:deps": "node ./scripts/audit-dependencies.mjs",
-    "audit:vulns": "node ./scripts/audit-vulnerabilities.mjs",
     "codegen": "npm run --workspace=@workspace/api-spec codegen",
     "db:migrate": "npm run --workspace=@workspace/db migrate",
     "db:migrate:down": "npm run --workspace=@workspace/db migrate:down",
@@ -27,14 +27,16 @@
   },
   "workspaces": [
     "artifacts/*",
-    "lib/*",
-    "scripts"
+    "lib/*"
   ],
   "private": true,
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@html-eslint/eslint-plugin": "0.66.1",
     "eslint": "10.12.0",
+    "eslint-plugin-sonarjs": "^4.2.2",
     "globals": "17.13.0",
+    "husky": "^9.1.7",
     "lightningcss": "1.33.0",
     "prettier": "3.9.5",
     "tapable": "2.3.3",

@@ -8,6 +8,7 @@ lib/api-zod/src/generated/
 **/dist/
 **/build/
 **/.tsbuildinfo
+**/*.html
 
 # Mockup sandbox is a standalone playground, not part of the app.
 artifacts/mockup-sandbox/

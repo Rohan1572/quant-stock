@@ -17,7 +17,7 @@ From the repository root:
 npm install
 ```
 
-This repository uses npm workspaces, so the install step sets up the frontend, API server, shared libraries, and scripts together. If you need a clean reinstall, run `npm run reinstall`.
+This repository uses npm workspaces for the frontend, API server, and shared libraries. Repository tooling lives in `scripts/`. If you need a clean reinstall, run `npm run reinstall`.
 
 ## 2. Configure environment variables
 
@@ -90,12 +90,13 @@ Run the scoring engine test suite:
 npm run test
 ```
 
-Run the SonarJS quality rules (the same analyzer SonarQube applies to JS/TS,
-without needing a server):
+Run ESLint with the recommended JavaScript, TypeScript, HTML, and SonarJS rules:
 
 ```powershell
 npm run lint
 ```
+
+Git commit messages are checked by Husky and must use Conventional Commits, for example `feat(api): add company search`.
 
 Apply the fixes ESLint can make automatically:
 
@@ -119,12 +120,10 @@ npm run audit:deps
 Check for new dependency vulnerabilities:
 
 ```powershell
-npm run audit:vulns
+npm audit
 ```
 
-This fails on any known advisory. Ones with no patched release would have to be
-listed, with a justification, in `scripts/audit-vulnerabilities.mjs`; that list is
-currently empty, since `npm audit` reports zero advisories.
+This fails when npm reports dependency vulnerabilities.
 
 It replaced `fast-glob` in the mockup sandbox, which was the only route to a
 high-severity `braces` stack-exhaustion advisory (CVE-2026-93687) with no
@@ -192,7 +191,7 @@ check whether an upstream package moved before suspecting the code.
 - `lib/api-client-react/` — generated React API client
 - `lib/api-zod/` — generated Zod schemas
 - `lib/db/` — Drizzle schema and migrations setup
-- `scripts/` — repository tooling: the dependency and vulnerability audits, and the post-merge hook
+- `scripts/` — repository tooling for dependency checks, clean builds, and reinstalls
 
 ## Scoring model
 

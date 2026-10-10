@@ -1,5 +1,7 @@
 import js from "@eslint/js";
+import html from "@html-eslint/eslint-plugin";
 import globals from "globals";
+import sonarjs from "eslint-plugin-sonarjs";
 import tseslint from "typescript-eslint";
 
 export default [
@@ -14,7 +16,12 @@ export default [
     ],
   },
   js.configs.recommended,
+  sonarjs.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    ...html.configs["flat/recommended"],
+    files: ["**/*.html"],
+  },
   {
     files: ["**/*.{js,mjs,cjs}"],
     languageOptions: { globals: globals.node },

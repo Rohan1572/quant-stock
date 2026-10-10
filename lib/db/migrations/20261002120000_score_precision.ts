@@ -1,3 +1,5 @@
+import type { MigrationBuilder } from "node-pg-migrate";
+
 // Adds the score-precision fields: an uncertainty band around the score, the
 // confidence breakdown that explains it, and the confidence-shrunk score that
 // actually drives the recommendation.
@@ -6,7 +8,7 @@
 // back to sensible defaults when they are absent.
 export const shorthands = undefined;
 
-export function up(pgm: any): void {
+export function up(pgm: MigrationBuilder): void {
   pgm.sql(`
     ALTER TABLE "score_results"
       ADD COLUMN IF NOT EXISTS "confidence_level" text,
@@ -33,7 +35,7 @@ export function up(pgm: any): void {
   `);
 }
 
-export function down(pgm: any): void {
+export function down(pgm: MigrationBuilder): void {
   pgm.sql(`
     ALTER TABLE "score_results"
       DROP COLUMN IF EXISTS "confidence_level",

@@ -1,6 +1,8 @@
+import type { MigrationBuilder } from "node-pg-migrate";
+
 export const shorthands = undefined;
 
-export function up(pgm: any): void {
+export function up(pgm: MigrationBuilder): void {
   pgm.sql(`
     CREATE TABLE "scoring_configs" (
       "id" serial PRIMARY KEY,
@@ -44,7 +46,7 @@ export function up(pgm: any): void {
   `);
 }
 
-export function down(pgm: any): void {
+export function down(pgm: MigrationBuilder): void {
   pgm.sql(`DROP TABLE IF EXISTS "score_results";`);
   pgm.sql(`DROP TABLE IF EXISTS "scoring_configs";`);
 }

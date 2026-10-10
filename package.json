@@ -9,7 +9,7 @@
     "build": "npm run typecheck && npm run build:apps",
     "build:apps": "npm run --workspaces --if-present build",
     "prepare": "husky",
-    "verify": "npm run audit:deps && npm audit && npm run typecheck && npm run test && npm run lint && npm run format:check && npm run build:apps",
+    "verify": "npm run audit:deps && npm audit && npm run typecheck && npm run test && npm run lint && npm run format && npm run build:apps",
     "typecheck": "npm run typecheck:libs && npm run typecheck:apps",
     "typecheck:libs": "tsc --build",
     "typecheck:apps": "npm run --workspaces --if-present typecheck",

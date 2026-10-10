@@ -8,7 +8,7 @@
     "dev:mockup": "npm run --workspace=@workspace/mockup-sandbox dev",
     "build": "npm run typecheck && npm run build:apps",
     "build:apps": "npm run --workspaces --if-present build",
-    "prepare": "husky",
+    "prepare": "node scripts/prepare.mjs",
     "verify": "npm run audit:deps && npm audit && npm run test && npm run lint && npm run format && npm run build",
     "typecheck": "npm run typecheck:libs && npm run typecheck:apps",
     "typecheck:libs": "tsc --build",

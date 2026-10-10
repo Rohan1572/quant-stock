@@ -30,6 +30,27 @@
       }
     },
     {
+      "source": "/rankings",
+      "destination": {
+        "service": "quantstock",
+        "path": "/"
+      }
+    },
+    {
+      "source": "/scoring-config",
+      "destination": {
+        "service": "quantstock",
+        "path": "/"
+      }
+    },
+    {
+      "source": "/stocks/(.*)",
+      "destination": {
+        "service": "quantstock",
+        "path": "/"
+      }
+    },
+    {
       "source": "/(.*)",
       "destination": {
         "service": "quantstock"

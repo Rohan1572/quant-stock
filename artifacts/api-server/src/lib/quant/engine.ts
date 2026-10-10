@@ -103,10 +103,10 @@ export class TickerNotFoundError extends Error {
 }
 
 async function computeFreshScore(ticker: string): Promise<ComputedScore> {
-  const profile = await provider.getProfile(ticker);
+  const { profile, financialSnapshot: fin } =
+    await provider.getScoringData(ticker);
   if (!profile) throw new TickerNotFoundError(ticker);
 
-  const fin = await provider.getFinancialSnapshot(ticker);
   const priceHistory = await provider.getPriceHistory(ticker, "1y");
   const snapshot = fin ?? EMPTY_SNAPSHOT;
 

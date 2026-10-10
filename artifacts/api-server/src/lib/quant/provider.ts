@@ -68,6 +68,10 @@ export interface DataProvider {
   search(query: string): Promise<StockSearchResult[]>;
   getProfile(ticker: string): Promise<StockProfile | null>;
   getFinancialSnapshot(ticker: string): Promise<FinancialSnapshot | null>;
+  getScoringData(ticker: string): Promise<{
+    profile: StockProfile | null;
+    financialSnapshot: FinancialSnapshot | null;
+  }>;
   getPriceHistory(
     ticker: string,
     range: "1m" | "6m" | "1y" | "5y",
@@ -99,65 +103,28 @@ export class YahooFinanceAdapter implements DataProvider {
 
   async getProfile(ticker: string): Promise<StockProfile | null> {
     const summary = await yahooQuoteSummary(ticker);
-    if (!summary) return null;
-
-    const price = summary.price ?? {};
-    const assetProfile = summary.assetProfile ?? {};
-
-    return {
-      ticker,
-      companyName:
-        (price["longName"] as string) ??
-        (price["shortName"] as string) ??
-        ticker,
-      sector: (assetProfile["sector"] as string) ?? null,
-      industry: (assetProfile["industry"] as string) ?? null,
-      marketCap: raw(price["marketCap"]),
-      currency: (price["currency"] as string) ?? "INR",
-      price: raw(price["regularMarketPrice"]),
-      changePercent: raw(price["regularMarketChangePercent"]),
-    };
+    return summary ? mapProfile(ticker, summary) : null;
   }
 
   async getFinancialSnapshot(
     ticker: string,
   ): Promise<FinancialSnapshot | null> {
     const summary = await yahooQuoteSummary(ticker);
-    if (!summary) return null;
+    return summary ? mapFinancialSnapshot(summary) : null;
+  }
 
-    const summaryDetail = summary.summaryDetail ?? {};
-    const keyStats = summary.defaultKeyStatistics ?? {};
-    const financialData = summary.financialData ?? {};
+  async getScoringData(ticker: string): Promise<{
+    profile: StockProfile | null;
+    financialSnapshot: FinancialSnapshot | null;
+  }> {
+    const summary = await yahooQuoteSummary(ticker);
+    if (!summary) {
+      return { profile: null, financialSnapshot: null };
+    }
 
     return {
-      peRatio: raw(summaryDetail["trailingPE"]),
-      forwardPe: raw(summaryDetail["forwardPE"]),
-      pbRatio: raw(keyStats["priceToBook"]),
-      evEbitda: raw(keyStats["enterpriseToEbitda"]),
-      pegRatio: raw(keyStats["pegRatio"]),
-      roe: toPercent(raw(financialData["returnOnEquity"])),
-      roa: toPercent(raw(financialData["returnOnAssets"])),
-      grossMargin: toPercent(raw(financialData["grossMargins"])),
-      operatingMargin: toPercent(raw(financialData["operatingMargins"])),
-      netMargin: toPercent(raw(financialData["profitMargins"])),
-      debtToEquity: normalizeDebtToEquity(raw(financialData["debtToEquity"])),
-      currentRatio: raw(financialData["currentRatio"]),
-      quickRatio: raw(financialData["quickRatio"]),
-      revenueGrowth: toPercent(raw(financialData["revenueGrowth"])),
-      earningsGrowth: toPercent(raw(financialData["earningsGrowth"])),
-      freeCashflow: raw(financialData["freeCashflow"]),
-      operatingCashflow: raw(financialData["operatingCashflow"]),
-      totalCash: raw(financialData["totalCash"]),
-      totalDebt: raw(financialData["totalDebt"]),
-      beta: raw(summaryDetail["beta"]),
-      fiftyDayAverage: raw(summaryDetail["fiftyDayAverage"]),
-      twoHundredDayAverage: raw(summaryDetail["twoHundredDayAverage"]),
-      fiftyTwoWeekHigh: raw(summaryDetail["fiftyTwoWeekHigh"]),
-      fiftyTwoWeekLow: raw(summaryDetail["fiftyTwoWeekLow"]),
-      sharesOutstanding: raw(keyStats["sharesOutstanding"]),
-      ebitda: raw(financialData["ebitda"]),
-      totalRevenue: raw(financialData["totalRevenue"]),
-      netIncome: raw(keyStats["netIncomeToCommon"]),
+      profile: mapProfile(ticker, summary),
+      financialSnapshot: mapFinancialSnapshot(summary),
     };
   }
 
@@ -167,6 +134,65 @@ export class YahooFinanceAdapter implements DataProvider {
   ): Promise<PricePoint[]> {
     return yahooChart(ticker, range);
   }
+}
+
+function mapProfile(
+  ticker: string,
+  summary: NonNullable<Awaited<ReturnType<typeof yahooQuoteSummary>>>,
+): StockProfile {
+  const price = summary.price ?? {};
+  const assetProfile = summary.assetProfile ?? {};
+
+  return {
+    ticker,
+    companyName:
+      (price["longName"] as string) ?? (price["shortName"] as string) ?? ticker,
+    sector: (assetProfile["sector"] as string) ?? null,
+    industry: (assetProfile["industry"] as string) ?? null,
+    marketCap: raw(price["marketCap"]),
+    currency: (price["currency"] as string) ?? "INR",
+    price: raw(price["regularMarketPrice"]),
+    changePercent: raw(price["regularMarketChangePercent"]),
+  };
+}
+
+function mapFinancialSnapshot(
+  summary: NonNullable<Awaited<ReturnType<typeof yahooQuoteSummary>>>,
+): FinancialSnapshot {
+  const summaryDetail = summary.summaryDetail ?? {};
+  const keyStats = summary.defaultKeyStatistics ?? {};
+  const financialData = summary.financialData ?? {};
+
+  return {
+    peRatio: raw(summaryDetail["trailingPE"]),
+    forwardPe: raw(summaryDetail["forwardPE"]),
+    pbRatio: raw(keyStats["priceToBook"]),
+    evEbitda: raw(keyStats["enterpriseToEbitda"]),
+    pegRatio: raw(keyStats["pegRatio"]),
+    roe: toPercent(raw(financialData["returnOnEquity"])),
+    roa: toPercent(raw(financialData["returnOnAssets"])),
+    grossMargin: toPercent(raw(financialData["grossMargins"])),
+    operatingMargin: toPercent(raw(financialData["operatingMargins"])),
+    netMargin: toPercent(raw(financialData["profitMargins"])),
+    debtToEquity: normalizeDebtToEquity(raw(financialData["debtToEquity"])),
+    currentRatio: raw(financialData["currentRatio"]),
+    quickRatio: raw(financialData["quickRatio"]),
+    revenueGrowth: toPercent(raw(financialData["revenueGrowth"])),
+    earningsGrowth: toPercent(raw(financialData["earningsGrowth"])),
+    freeCashflow: raw(financialData["freeCashflow"]),
+    operatingCashflow: raw(financialData["operatingCashflow"]),
+    totalCash: raw(financialData["totalCash"]),
+    totalDebt: raw(financialData["totalDebt"]),
+    beta: raw(summaryDetail["beta"]),
+    fiftyDayAverage: raw(summaryDetail["fiftyDayAverage"]),
+    twoHundredDayAverage: raw(summaryDetail["twoHundredDayAverage"]),
+    fiftyTwoWeekHigh: raw(summaryDetail["fiftyTwoWeekHigh"]),
+    fiftyTwoWeekLow: raw(summaryDetail["fiftyTwoWeekLow"]),
+    sharesOutstanding: raw(keyStats["sharesOutstanding"]),
+    ebitda: raw(financialData["ebitda"]),
+    totalRevenue: raw(financialData["totalRevenue"]),
+    netIncome: raw(keyStats["netIncomeToCommon"]),
+  };
 }
 
 // Yahoo returns ratios like ROE/margins as fractions (0.18 = 18%); some

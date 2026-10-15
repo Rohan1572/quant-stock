@@ -13,7 +13,6 @@
   "dependencies": {
     "@workspace/api-zod": "0.0.0",
     "@workspace/db": "0.0.0",
-    "cookie-parser": "1.4.7",
     "cors": "2.8.6",
     "drizzle-orm": "0.45.2",
     "express": "5.2.1",
@@ -22,7 +21,6 @@
     "pino-http": "10.5.0"
   },
   "devDependencies": {
-    "@types/cookie-parser": "1.4.10",
     "@types/cors": "2.8.19",
     "@types/express": "5.0.6",
     "@types/node": "25.9.5",

@@ -30,7 +30,7 @@ export { round } from "./statistics";
 export type Recommendation =
   "strong_buy" | "buy" | "hold" | "reduce" | "sell" | "strong_short";
 
-export interface CategoryScores {
+interface CategoryScores {
   valuation: number;
   financialHealth: number;
   profitability: number;
@@ -39,7 +39,7 @@ export interface CategoryScores {
   momentum: number;
 }
 
-export interface MetricDetail {
+interface MetricDetail {
   key: string;
   label: string;
   value: number | null;
@@ -125,7 +125,7 @@ const METRIC_NOISE = 9;
 const MODEL_ERROR = 7;
 
 /** Clamp any raw score to the 0-100 scale used throughout the model. */
-export function clampScore(value: number): number {
+function clampScore(value: number): number {
   if (!Number.isFinite(value)) return 50;
   return Math.max(0, Math.min(100, value));
 }
@@ -354,7 +354,7 @@ function netMarginReference(fin: FinancialSnapshot): number {
 }
 
 // ROE carries the largest weight: it already embeds margin, turnover, leverage.
-export function scoreProfitability(
+function scoreProfitability(
   fin: FinancialSnapshot,
   bench: SectorBenchmark,
 ): CategoryDetail {
@@ -394,7 +394,7 @@ export function scoreProfitability(
 
 // Earnings growth gets a wider dispersion than revenue growth: it is noisier off
 // a small base, and one scale let it dominate the category.
-export function scoreGrowth(fin: FinancialSnapshot): CategoryDetail {
+function scoreGrowth(fin: FinancialSnapshot): CategoryDetail {
   const metrics = [
     percentMetric(
       "revenueGrowth",

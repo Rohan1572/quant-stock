@@ -427,8 +427,6 @@ export const WATCHLIST: WatchlistEntry[] = [
   },
 ];
 
-export const WATCHLIST_TICKERS = new Set(WATCHLIST.map((e) => e.ticker));
-
 export function getWatchlistEntry(ticker: string): WatchlistEntry | undefined {
   return WATCHLIST.find((e) => e.ticker === ticker.toUpperCase());
 }

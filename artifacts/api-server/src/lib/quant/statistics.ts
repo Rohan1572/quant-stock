@@ -3,13 +3,13 @@
 // asymmetric for multiplicative ratios, hard-clamped so every bad value looked
 // identical, and scored non-meaningful inputs (negative P/E) as excellent.
 
-export const NEUTRAL_SCORE = 50;
+const NEUTRAL_SCORE = 50;
 
 /** Excluded from aggregation rather than averaged in. */
 export const INVALID_SCORE = Number.NaN;
 
 /** Saturates to +/-1. Uses the sigmoid form to avoid exp() overflow. */
-export function tanh(x: number): number {
+function tanh(x: number): number {
   if (!Number.isFinite(x)) return Math.sign(x) || 0;
   const z = 2 * x;
   if (z > 40) return 1;
@@ -22,13 +22,13 @@ export function tanh(x: number): number {
 const SATURATION_SIGMAS = 1.5;
 
 /** Clamp to 0-100, mapping non-finite input to the neutral score. */
-export function clampScore(value: number): number {
+function clampScore(value: number): number {
   if (!Number.isFinite(value)) return NEUTRAL_SCORE;
   return Math.max(0, Math.min(100, value));
 }
 
 /** Convert a z-score into a 0-100 score, saturating smoothly. */
-export function zToScore(z: number, higherIsBetter: boolean): number {
+function zToScore(z: number, higherIsBetter: boolean): number {
   if (!Number.isFinite(z)) return NEUTRAL_SCORE;
   const signed = higherIsBetter ? z : -z;
   return clampScore(NEUTRAL_SCORE + 50 * tanh(signed / SATURATION_SIGMAS));

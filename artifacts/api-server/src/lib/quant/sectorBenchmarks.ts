@@ -17,7 +17,7 @@ export interface SectorBenchmark {
   debtToEquity: number;
 }
 
-export const DEFAULT_BENCHMARK: SectorBenchmark = {
+const DEFAULT_BENCHMARK: SectorBenchmark = {
   peRatio: 24,
   pbRatio: 3.2,
   evEbitda: 14,
@@ -30,7 +30,7 @@ export const DEFAULT_BENCHMARK: SectorBenchmark = {
   debtToEquity: 0.6,
 };
 
-export const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
+const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
   Technology: {
     peRatio: 27,
     pbRatio: 8,

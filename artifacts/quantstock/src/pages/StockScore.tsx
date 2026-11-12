@@ -563,7 +563,10 @@ export default function StockScore() {
                     </h4>
                     <ul className="space-y-2">
                       {score?.explanation.reasons.map((reason) => (
-                        <li key={`reason-${reason}`} className="text-sm flex items-start">
+                        <li
+                          key={`reason-${reason}`}
+                          className="text-sm flex items-start"
+                        >
                           <span className="w-1.5 h-1.5 rounded-full bg-buy mt-1.5 mr-2 shrink-0" />
                           <span className="text-foreground/90 leading-tight">
                             {reason}
@@ -583,7 +586,10 @@ export default function StockScore() {
                     </h4>
                     <ul className="space-y-2">
                       {score?.explanation.risks.map((risk) => (
-                        <li key={`risk-${risk}`} className="text-sm flex items-start">
+                        <li
+                          key={`risk-${risk}`}
+                          className="text-sm flex items-start"
+                        >
                           <span className="w-1.5 h-1.5 rounded-full bg-sell mt-1.5 mr-2 shrink-0" />
                           <span className="text-foreground/90 leading-tight">
                             {risk}

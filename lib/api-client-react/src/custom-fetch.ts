@@ -252,7 +252,7 @@ export class ResponseParseError extends Error {
   ) {
     super(
       `Failed to parse response from ${requestInfo.method} ${response.url || requestInfo.url} ` +
-      `(${response.status} ${response.statusText}) as JSON`,
+        `(${response.status} ${response.statusText}) as JSON`,
     );
     Object.setPrototypeOf(this, new.target.prototype);
 
@@ -354,7 +354,7 @@ async function parseSuccessBody(
       if (typeof response.blob !== "function") {
         throw new TypeError(
           "Blob responses are not supported in this runtime. " +
-          'Use responseType "json" or "text" instead.',
+            'Use responseType "json" or "text" instead.',
         );
       }
       return response.blob();

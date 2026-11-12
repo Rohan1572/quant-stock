@@ -226,7 +226,10 @@ export default function ScoringConfig() {
               >
                 {editingSector !== null && (
                   <div className="max-w-sm space-y-2">
-                    <label htmlFor="sector-name" className="text-sm font-medium">
+                    <label
+                      htmlFor="sector-name"
+                      className="text-sm font-medium"
+                    >
                       Sector Name
                     </label>
                     <Input
@@ -249,7 +252,10 @@ export default function ScoringConfig() {
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6 p-4 bg-muted/20 rounded-xl border border-dashed">
                   <div className="space-y-2">
-                    <label htmlFor="valuation-weight" className="text-sm font-medium">
+                    <label
+                      htmlFor="valuation-weight"
+                      className="text-sm font-medium"
+                    >
                       Valuation
                     </label>
                     <Input
@@ -262,7 +268,10 @@ export default function ScoringConfig() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label htmlFor="financial-health-weight" className="text-sm font-medium">
+                    <label
+                      htmlFor="financial-health-weight"
+                      className="text-sm font-medium"
+                    >
                       Financial Health
                     </label>
                     <Input
@@ -275,7 +284,10 @@ export default function ScoringConfig() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label htmlFor="profitability-weight" className="text-sm font-medium">
+                    <label
+                      htmlFor="profitability-weight"
+                      className="text-sm font-medium"
+                    >
                       Profitability
                     </label>
                     <Input
@@ -288,7 +300,10 @@ export default function ScoringConfig() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label htmlFor="growth-weight" className="text-sm font-medium">
+                    <label
+                      htmlFor="growth-weight"
+                      className="text-sm font-medium"
+                    >
                       Growth
                     </label>
                     <Input
@@ -301,7 +316,10 @@ export default function ScoringConfig() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label htmlFor="risk-weight" className="text-sm font-medium">
+                    <label
+                      htmlFor="risk-weight"
+                      className="text-sm font-medium"
+                    >
                       Risk
                     </label>
                     <Input
@@ -314,7 +332,10 @@ export default function ScoringConfig() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label htmlFor="momentum-weight" className="text-sm font-medium">
+                    <label
+                      htmlFor="momentum-weight"
+                      className="text-sm font-medium"
+                    >
                       Momentum
                     </label>
                     <Input

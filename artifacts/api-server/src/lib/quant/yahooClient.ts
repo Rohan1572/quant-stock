@@ -1,4 +1,5 @@
 import { logger } from "../logger";
+import { singleFlight } from "./singleFlight";
 
 // Thin, low-level client for Yahoo Finance's unofficial public endpoints.
 // This is a *prototype-tier* data source (see .local/skills — no SLA, can
@@ -17,6 +18,11 @@ const CRUMB_TTL_MS = 30 * 60 * 1000;
 const quoteSummaryRequests = new Map<
   string,
   Promise<YahooQuoteSummary | null>
+>();
+const chartRequests = new Map<string, Promise<YahooChartPoint[]>>();
+const crumbRefreshRequests = new Map<
+  string,
+  Promise<{ cookie: string; crumb: string }>
 >();
 
 function fetchWithTimeout(
@@ -60,11 +66,11 @@ async function refreshCrumb(): Promise<{ cookie: string; crumb: string }> {
   return { cookie, crumb };
 }
 
-async function getCrumb(): Promise<{ cookie: string; crumb: string }> {
+function getCrumb(): Promise<{ cookie: string; crumb: string }> {
   if (cachedCrumb && Date.now() - crumbFetchedAt < CRUMB_TTL_MS) {
-    return { cookie: cachedCookie ?? "", crumb: cachedCrumb };
+    return Promise.resolve({ cookie: cachedCookie ?? "", crumb: cachedCrumb });
   }
-  return refreshCrumb();
+  return singleFlight(crumbRefreshRequests, "yahoo", refreshCrumb);
 }
 
 async function fetchJson(url: string): Promise<unknown> {
@@ -146,7 +152,18 @@ const RANGE_TO_YAHOO: Record<string, { range: string; interval: string }> = {
   "5y": { range: "5y", interval: "1wk" },
 };
 
-export async function yahooChart(
+export function yahooChart(
+  ticker: string,
+  range: "1m" | "6m" | "1y" | "5y",
+): Promise<YahooChartPoint[]> {
+  const normalizedTicker = ticker.toUpperCase();
+  const key = `${normalizedTicker}:${range}`;
+  return singleFlight(chartRequests, key, () =>
+    fetchYahooChart(normalizedTicker, range),
+  );
+}
+
+async function fetchYahooChart(
   ticker: string,
   range: "1m" | "6m" | "1y" | "5y",
 ): Promise<YahooChartPoint[]> {
@@ -193,11 +210,7 @@ export interface YahooQuoteSummary {
   summaryDetail?: Record<string, unknown>;
   defaultKeyStatistics?: Record<string, unknown>;
   financialData?: Record<string, unknown>;
-  incomeStatementHistory?: { incomeStatementHistory?: unknown[] };
-  balanceSheetHistory?: { balanceSheetStatements?: unknown[] };
-  cashflowStatementHistory?: { cashflowStatements?: unknown[] };
   assetProfile?: Record<string, unknown>;
-  earningsHistory?: { history?: unknown[] };
 }
 
 const QUOTE_SUMMARY_MODULES = [
@@ -205,9 +218,6 @@ const QUOTE_SUMMARY_MODULES = [
   "summaryDetail",
   "defaultKeyStatistics",
   "financialData",
-  "incomeStatementHistory",
-  "balanceSheetHistory",
-  "cashflowStatementHistory",
   "assetProfile",
 ].join(",");
 
@@ -215,16 +225,9 @@ export function yahooQuoteSummary(
   ticker: string,
 ): Promise<YahooQuoteSummary | null> {
   const key = ticker.toUpperCase();
-  const pending = quoteSummaryRequests.get(key);
-  if (pending) return pending;
-
-  const request = fetchYahooQuoteSummary(key).finally(() => {
-    if (quoteSummaryRequests.get(key) === request) {
-      quoteSummaryRequests.delete(key);
-    }
-  });
-  quoteSummaryRequests.set(key, request);
-  return request;
+  return singleFlight(quoteSummaryRequests, key, () =>
+    fetchYahooQuoteSummary(key),
+  );
 }
 
 async function fetchYahooQuoteSummary(

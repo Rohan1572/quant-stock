@@ -135,6 +135,7 @@ export default function Rankings() {
   const { data, isLoading, refetch } = useGetRankings({
     query: {
       queryKey: getGetRankingsQueryKey(),
+      staleTime: 0,
       refetchInterval: (q) => (q.state.data?.isRefreshing ? 5_000 : false),
     },
   });

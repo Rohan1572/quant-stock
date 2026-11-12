@@ -3,6 +3,7 @@ import { eq, isNull } from "drizzle-orm";
 import { logger } from "../logger";
 import { YahooFinanceAdapter, type DataProvider } from "./provider";
 import { fetchScoringInputs } from "./scoringInputs";
+import { singleFlight } from "./singleFlight";
 import {
   computeCategories,
   computeConfidence,
@@ -35,6 +36,7 @@ const DEFAULT_WEIGHTS: CategoryWeights = {
 // Within this window the cached row is served. Short, because scoring is
 // on-demand; the cache only absorbs rapid repeat lookups.
 const SCORE_CACHE_TTL_MS = 15 * 60 * 1000;
+const scoreRequests = new Map<string, Promise<ComputedScore>>();
 
 async function getWeightsForSector(
   sector: string | null,
@@ -184,9 +186,14 @@ const EMPTY_SNAPSHOT = {
   netIncome: null,
 };
 
-export async function getScore(ticker: string): Promise<ComputedScore> {
+export function getScore(ticker: string): Promise<ComputedScore> {
   const normalized = ticker.toUpperCase();
+  return singleFlight(scoreRequests, normalized, () =>
+    loadScore(normalized),
+  );
+}
 
+async function loadScore(normalized: string): Promise<ComputedScore> {
   const [cached] = await db
     .select()
     .from(scoreResultsTable)

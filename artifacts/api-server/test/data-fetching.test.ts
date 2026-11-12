@@ -5,8 +5,12 @@ import {
   fetchScoringInputs,
   TickerNotFoundError,
 } from "../src/lib/quant/scoringInputs";
+import { singleFlight } from "../src/lib/quant/singleFlight";
 import type { DataProvider, StockProfile } from "../src/lib/quant/provider";
-import { yahooQuoteSummary } from "../src/lib/quant/yahooClient";
+import {
+  yahooChart,
+  yahooQuoteSummary,
+} from "../src/lib/quant/yahooClient";
 
 const TEST_PROFILE: StockProfile = {
   ticker: "TEST.NS",
@@ -76,13 +80,50 @@ describe("score input fetching", () => {
 });
 
 describe("Yahoo quote-summary request coalescing", () => {
+  it("shares cold crumb refreshes across different tickers", async () => {
+    const originalFetch = globalThis.fetch;
+    let cookieRequests = 0;
+    let crumbRequests = 0;
+    let quoteSummaryRequests = 0;
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("fc.yahoo.com")) {
+        cookieRequests++;
+        return new Response("", { status: 200 });
+      }
+      if (url.includes("/v1/test/getcrumb")) {
+        crumbRequests++;
+        return new Response("test-crumb");
+      }
+      if (url.includes("/v10/finance/quoteSummary/")) {
+        quoteSummaryRequests++;
+        return Response.json({ quoteSummary: { result: [{ price: {} }] } });
+      }
+      return new Response("", { status: 200 });
+    };
+
+    try {
+      await Promise.all([
+        yahooQuoteSummary("FIRST.NS"),
+        yahooQuoteSummary("SECOND.NS"),
+      ]);
+      assert.equal(cookieRequests, 1);
+      assert.equal(crumbRequests, 1);
+      assert.equal(quoteSummaryRequests, 2);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("shares concurrent requests but does not cache completed responses", async () => {
     const originalFetch = globalThis.fetch;
     let quoteSummaryRequests = 0;
+    let requestedModules: string | null = null;
     globalThis.fetch = async (input) => {
       const url = String(input);
       if (url.includes("/v10/finance/quoteSummary/")) {
         quoteSummaryRequests++;
+        requestedModules = new URL(url).searchParams.get("modules");
         return Response.json({
           quoteSummary: { result: [{ price: { regularMarketPrice: 42 } }] },
         });
@@ -100,6 +141,10 @@ describe("Yahoo quote-summary request coalescing", () => {
       ]);
       assert.deepEqual(first, second);
       assert.equal(quoteSummaryRequests, 1);
+      assert.equal(
+        requestedModules,
+        "price,summaryDetail,defaultKeyStatistics,financialData,assetProfile",
+      );
 
       await yahooQuoteSummary("TEST.NS");
       assert.equal(quoteSummaryRequests, 2);
@@ -140,5 +185,72 @@ describe("Yahoo quote-summary request coalescing", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+});
+
+describe("Yahoo chart request coalescing", () => {
+  it("shares concurrent history requests for the same ticker and range", async () => {
+    const originalFetch = globalThis.fetch;
+    let chartRequests = 0;
+    globalThis.fetch = async (input) => {
+      if (String(input).includes("/v8/finance/chart/")) {
+        chartRequests++;
+        return Response.json({
+          chart: {
+            result: [
+              {
+                timestamp: [1_762_992_000],
+                indicators: { quote: [{ close: [42], volume: [100] }] },
+              },
+            ],
+          },
+        });
+      }
+      return new Response("", { status: 200 });
+    };
+
+    try {
+      const [first, second] = await Promise.all([
+        yahooChart("TEST.NS", "1y"),
+        yahooChart("test.ns", "1y"),
+      ]);
+      assert.deepEqual(first, second);
+      assert.equal(chartRequests, 1);
+
+      await yahooChart("TEST.NS", "1y");
+      assert.equal(chartRequests, 2);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("single-flight request helper", () => {
+  it("shares concurrent work and removes both successful and failed tasks", async () => {
+    const requests = new Map<string, Promise<number>>();
+    let calls = 0;
+    const createRequest = async () => {
+      calls++;
+      return 42;
+    };
+
+    const [first, second] = await Promise.all([
+      singleFlight(requests, "ticker", createRequest),
+      singleFlight(requests, "ticker", createRequest),
+    ]);
+    assert.equal(first, 42);
+    assert.equal(second, 42);
+    assert.equal(calls, 1);
+    assert.equal(requests.size, 0);
+
+    const failure = new Error("request failed");
+    await assert.rejects(
+      singleFlight(requests, "ticker", async () => {
+        throw failure;
+      }),
+      failure,
+    );
+    assert.equal(requests.size, 0);
+    assert.equal(await singleFlight(requests, "ticker", async () => 7), 7);
   });
 });

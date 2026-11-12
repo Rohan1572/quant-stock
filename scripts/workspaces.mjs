@@ -19,24 +19,52 @@ export function workspaces() {
     fs.readFileSync(path.join(root, "package.json"), "utf8"),
   );
   const dirs = new Set([root]);
-  for (const pattern of pkg.workspaces ?? []) {
-    // Only the simple "dir/*" form is used here; anything else resolves the
-    // literal path rather than guessing at a glob.
-    if (!pattern.endsWith("/*")) {
-      const direct = path.join(root, pattern);
-      if (fs.existsSync(path.join(direct, "package.json"))) dirs.add(direct);
-      continue;
-    }
-    const parent = path.join(root, pattern.slice(0, -2));
-    if (!fs.existsSync(parent)) continue;
-    for (const entry of fs.readdirSync(parent, { withFileTypes: true })) {
-      if (
-        entry.isDirectory() &&
-        fs.existsSync(path.join(parent, entry.name, "package.json"))
-      ) {
-        dirs.add(path.join(parent, entry.name));
-      }
-    }
-  }
+  for (const pattern of pkg.workspaces ?? [])
+    addWorkspacePattern(pattern, dirs);
   return [...dirs];
+}
+
+function addWorkspacePattern(pattern, dirs) {
+  if (typeof pattern !== "string") {
+    throw new TypeError(`Invalid workspace pattern: ${String(pattern)}`);
+  }
+  if (!isSupportedPattern(pattern)) {
+    throw new Error(
+      `Unsupported workspace pattern "${pattern}"; use a directory path or a direct-child pattern (dir/*).`,
+    );
+  }
+
+  if (pattern.endsWith("/*")) {
+    addChildWorkspaces(pattern, dirs);
+    return;
+  }
+
+  const direct = path.join(root, pattern);
+  if (fs.existsSync(path.join(direct, "package.json"))) dirs.add(direct);
+}
+
+function isSupportedPattern(pattern) {
+  if (!hasGlobSyntax(pattern)) return true;
+  return pattern.endsWith("/*") && !hasGlobSyntax(pattern.slice(0, -2));
+}
+
+function addChildWorkspaces(pattern, dirs) {
+  const parent = path.join(root, pattern.slice(0, -2));
+  if (!fs.existsSync(parent)) return;
+
+  for (const entry of fs.readdirSync(parent, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const workspace = path.join(parent, entry.name);
+    if (fs.existsSync(path.join(workspace, "package.json")))
+      dirs.add(workspace);
+  }
+}
+
+function hasGlobSyntax(pattern) {
+  return (
+    pattern.startsWith("!") ||
+    ["*", "?", "[", "]", "{", "}"].some((character) =>
+      pattern.includes(character),
+    )
+  );
 }

@@ -14,6 +14,10 @@ let cachedCookie: string | null = null;
 let cachedCrumb: string | null = null;
 let crumbFetchedAt = 0;
 const CRUMB_TTL_MS = 30 * 60 * 1000;
+const quoteSummaryRequests = new Map<
+  string,
+  Promise<YahooQuoteSummary | null>
+>();
 
 function fetchWithTimeout(
   url: string,
@@ -207,7 +211,23 @@ const QUOTE_SUMMARY_MODULES = [
   "assetProfile",
 ].join(",");
 
-export async function yahooQuoteSummary(
+export function yahooQuoteSummary(
+  ticker: string,
+): Promise<YahooQuoteSummary | null> {
+  const key = ticker.toUpperCase();
+  const pending = quoteSummaryRequests.get(key);
+  if (pending) return pending;
+
+  const request = fetchYahooQuoteSummary(key).finally(() => {
+    if (quoteSummaryRequests.get(key) === request) {
+      quoteSummaryRequests.delete(key);
+    }
+  });
+  quoteSummaryRequests.set(key, request);
+  return request;
+}
+
+async function fetchYahooQuoteSummary(
   ticker: string,
 ): Promise<YahooQuoteSummary | null> {
   const baseUrl = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(

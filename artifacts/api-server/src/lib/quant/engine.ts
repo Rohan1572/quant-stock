@@ -2,6 +2,7 @@ import { db, scoreResultsTable, scoringConfigsTable } from "@workspace/db";
 import { eq, isNull } from "drizzle-orm";
 import { logger } from "../logger";
 import { YahooFinanceAdapter, type DataProvider } from "./provider";
+import { fetchScoringInputs } from "./scoringInputs";
 import {
   computeCategories,
   computeConfidence,
@@ -17,6 +18,8 @@ import {
   type ScoreRange,
 } from "./scoring";
 import { buildExplanation, buildTopFactors, buildRiskFlags } from "./explain";
+
+export { TickerNotFoundError } from "./scoringInputs";
 
 const provider: DataProvider = new YahooFinanceAdapter();
 
@@ -96,18 +99,9 @@ export interface ComputedScore {
   computedAt: Date;
 }
 
-export class TickerNotFoundError extends Error {
-  constructor(ticker: string) {
-    super(`Ticker not found: ${ticker}`);
-  }
-}
-
 async function computeFreshScore(ticker: string): Promise<ComputedScore> {
-  const { profile, financialSnapshot: fin } =
-    await provider.getScoringData(ticker);
-  if (!profile) throw new TickerNotFoundError(ticker);
-
-  const priceHistory = await provider.getPriceHistory(ticker, "1y");
+  const { profile, financialSnapshot: fin, priceHistory } =
+    await fetchScoringInputs(provider, ticker);
   const snapshot = fin ?? EMPTY_SNAPSHOT;
 
   const weights = await getWeightsForSector(profile.sector);

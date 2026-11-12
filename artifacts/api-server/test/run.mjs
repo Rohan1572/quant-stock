@@ -7,33 +7,37 @@
 // — esbuild is already a devDependency of this package.
 import { spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { dirname } from "node:path";
 import { build } from "esbuild";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 async function main() {
-  const outDir = await mkdtemp(join(tmpdir(), "quantstock-test-"));
-  const outfile = join(outDir, "bundle.mjs");
+  const outDir = await mkdtemp(join(here, ".quantstock-test-"));
+  const testFiles = ["scoring.test", "data-fetching.test"].map((name) =>
+    join(outDir, `${name}.mjs`),
+  );
 
   try {
     await build({
-      entryPoints: [join(here, "scoring.test.ts")],
+      entryPoints: [
+        join(here, "scoring.test.ts"),
+        join(here, "data-fetching.test.ts"),
+      ],
       bundle: true,
       format: "esm",
       platform: "node",
       target: "node22",
-      outfile,
+      outdir: outDir,
+      outExtension: { ".js": ".mjs" },
       logLevel: "warning",
-      // node:test and node:assert must stay external so the runner recognises
-      // them; bundling them would inline a second copy of the test registry.
-      external: ["node:*"],
+      // Keep Node built-ins external for the test registry, and Pino external
+      // because its Node-specific dynamic loading does not bundle cleanly as ESM.
+      external: ["node:*", "pino"],
     });
 
-    const child = spawn(process.execPath, ["--test", outfile], {
+    const child = spawn(process.execPath, ["--test", ...testFiles], {
       stdio: "inherit",
     });
 
@@ -46,7 +50,9 @@ async function main() {
   }
 }
 
-main().catch((err) => {
+try {
+  await main();
+} catch (err) {
   console.error(err);
   process.exitCode = 1;
-});
+}

@@ -21,18 +21,25 @@ export async function fetchScoringInputs(
   provider: Pick<DataProvider, "getScoringData" | "getPriceHistory">,
   ticker: string,
 ): Promise<ScoringInputs> {
-  const [scoringData, priceHistory] = await Promise.allSettled([
-    provider.getScoringData(ticker),
-    provider.getPriceHistory(ticker, "1y"),
-  ]);
+  const scoringDataPromise = provider.getScoringData(ticker).then((data) => {
+    const profile = data.profile;
+    if (!profile) throw new TickerNotFoundError(ticker);
+    return { ...data, profile };
+  });
+  const priceHistoryPromise = provider.getPriceHistory(ticker, "1y").then(
+    (value) => ({ ok: true as const, value }),
+    (error: unknown) => ({ ok: false as const, error }),
+  );
 
-  if (scoringData.status === "rejected") throw scoringData.reason;
-  if (!scoringData.value.profile) throw new TickerNotFoundError(ticker);
-  if (priceHistory.status === "rejected") throw priceHistory.reason;
+  const [scoringData, priceHistory] = await Promise.all([
+    scoringDataPromise,
+    priceHistoryPromise,
+  ]);
+  if (!priceHistory.ok) throw priceHistory.error;
 
   return {
-    profile: scoringData.value.profile,
-    financialSnapshot: scoringData.value.financialSnapshot,
+    profile: scoringData.profile,
+    financialSnapshot: scoringData.financialSnapshot,
     priceHistory: priceHistory.value,
   };
 }

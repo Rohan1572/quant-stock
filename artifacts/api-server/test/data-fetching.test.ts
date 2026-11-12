@@ -52,15 +52,25 @@ describe("score input fetching", () => {
   it("reports a missing ticker even when its history request fails", async () => {
     const provider = scoringProvider(
       async () => ({ profile: null, financialSnapshot: null }),
-      async () => {
-        throw new Error("history unavailable");
-      },
+      () => new Promise<never>(() => {}),
     );
 
     await assert.rejects(
       fetchScoringInputs(provider, "MISSING.NS"),
       TickerNotFoundError,
     );
+  });
+
+  it("returns quote failures without waiting for unresolved history", async () => {
+    const quoteError = new Error("quote summary unavailable");
+    const provider = scoringProvider(
+      async () => {
+        throw quoteError;
+      },
+      () => new Promise<never>(() => {}),
+    );
+
+    await assert.rejects(fetchScoringInputs(provider, "TEST.NS"), quoteError);
   });
 
   it("propagates history failures for a valid ticker", async () => {

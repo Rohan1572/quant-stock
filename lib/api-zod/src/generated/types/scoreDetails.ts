@@ -18,15 +18,19 @@ import type { ScoreRange } from './scoreRange';
 export interface ScoreDetails {
   ticker: string;
   overallScore: number;
+  /** Screening rating based on the model score; not a trade recommendation */
   recommendation: ScoreDetailsRecommendation;
   confidence: number;
   confidenceLevel: ScoreDetailsConfidenceLevel;
   confidenceBreakdown: ConfidenceBreakdown;
   scoreRange: ScoreRange;
-  /** Score shrunk toward neutral for uncertainty; drives the recommendation */
+  /** Score shrunk toward neutral for uncertainty; drives the screening rating */
   adjustedScore: number;
   dataCoverage: number;
-  /** @nullable */
+  /**
+     * Illustrative equity DCF estimate; null when inputs are unsuitable or the sector is financial services
+     * @nullable
+     */
   fairValueEstimate?: number | null;
   categoryScores: CategoryScores;
   categories: CategoryDetail[];

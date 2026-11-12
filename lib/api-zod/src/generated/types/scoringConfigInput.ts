@@ -12,10 +12,34 @@ export interface ScoringConfigInput {
      * @nullable
      */
   sector: string | null;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
   valuationWeight: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
   financialHealthWeight: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
   profitabilityWeight: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
   growthWeight: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
   riskWeight: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
   momentumWeight: number;
 }

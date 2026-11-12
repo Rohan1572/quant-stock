@@ -56,6 +56,7 @@ export interface FinancialSnapshot {
 
 export interface PricePoint {
   date: string;
+  /** Adjusted close when the provider supplies one; otherwise the raw close. */
   close: number;
   volume: number;
 }

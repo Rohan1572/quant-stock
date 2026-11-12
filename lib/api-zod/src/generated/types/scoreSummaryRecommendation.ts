@@ -6,14 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * Screening rating based on the model score; not a trade recommendation
+ */
 export type ScoreSummaryRecommendation = typeof ScoreSummaryRecommendation[keyof typeof ScoreSummaryRecommendation];
 
 
 export const ScoreSummaryRecommendation = {
-  strong_buy: 'strong_buy',
-  buy: 'buy',
-  hold: 'hold',
-  reduce: 'reduce',
-  sell: 'sell',
-  strong_short: 'strong_short',
+  very_positive: 'very_positive',
+  positive: 'positive',
+  neutral: 'neutral',
+  negative: 'negative',
+  very_negative: 'very_negative',
+  extremely_negative: 'extremely_negative',
 } as const;

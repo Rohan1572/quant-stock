@@ -5,15 +5,21 @@
  * QuantStock API — NSE/BSE stock scoring engine
  * OpenAPI spec version: 0.1.0
  */
+import type { DcfAssumptionsDiscountRateType } from './dcfAssumptionsDiscountRateType';
 
 export interface DcfAssumptions {
-  /** Company-specific CAPM-derived discount rate */
-  wacc: number;
+  /** CAPM-derived cost of equity used to discount equity cash flow */
+  discountRate: number;
+  discountRateType: DcfAssumptionsDiscountRateType;
   terminalGrowthRate: number;
   projectionYears: number;
   riskFreeRate?: number;
   equityRiskPremium?: number;
   beta?: number;
-  initialGrowthRate?: number;
+  /**
+     * Initial FCF growth proxy based on revenue growth
+     * @nullable
+     */
+  initialGrowthRate?: number | null;
   terminalYearGrowthRate?: number;
 }

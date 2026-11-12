@@ -64,16 +64,19 @@ export interface ScoreExplanation {
   risks: string[];
 }
 
+/**
+ * Screening rating based on the model score; not a trade recommendation
+ */
 export type ScoreSummaryRecommendation = typeof ScoreSummaryRecommendation[keyof typeof ScoreSummaryRecommendation];
 
 
 export const ScoreSummaryRecommendation = {
-  strong_buy: 'strong_buy',
-  buy: 'buy',
-  hold: 'hold',
-  reduce: 'reduce',
-  sell: 'sell',
-  strong_short: 'strong_short',
+  very_positive: 'very_positive',
+  positive: 'positive',
+  neutral: 'neutral',
+  negative: 'negative',
+  very_negative: 'very_negative',
+  extremely_negative: 'extremely_negative',
 } as const;
 
 export type ScoreSummaryConfidenceLevel = typeof ScoreSummaryConfidenceLevel[keyof typeof ScoreSummaryConfidenceLevel];
@@ -91,7 +94,7 @@ export const ScoreSummaryConfidenceLevel = {
 export interface ConfidenceBreakdown {
   /** Importance-weighted share of the model that had usable data */
   dataCoverage: number;
-  /** How independent the available metrics are of each other */
+  /** Legacy field measuring how evenly available metric weights are distributed. It does not estimate statistical independence. */
   metricDiversity: number;
   /** Data freshness and internal consistency of the snapshot */
   dataQuality: number;
@@ -102,7 +105,7 @@ export interface ConfidenceBreakdown {
 }
 
 /**
- * 95% interval around the score. The model cannot claim more precision than this; a wide band means the point estimate should not be read literally.
+ * Indicative model-uncertainty band. It is not a calibrated statistical confidence interval; a wide band means the point estimate should not be read literally.
  */
 export interface ScoreRange {
   low: number;
@@ -112,15 +115,19 @@ export interface ScoreRange {
 export interface ScoreSummary {
   ticker: string;
   overallScore: number;
+  /** Screening rating based on the model score; not a trade recommendation */
   recommendation: ScoreSummaryRecommendation;
   confidence: number;
   confidenceLevel: ScoreSummaryConfidenceLevel;
   confidenceBreakdown: ConfidenceBreakdown;
   scoreRange: ScoreRange;
-  /** Score shrunk toward neutral for uncertainty; drives the recommendation */
+  /** Score shrunk toward neutral for uncertainty; drives the screening rating */
   adjustedScore: number;
   dataCoverage: number;
-  /** @nullable */
+  /**
+     * Illustrative equity DCF estimate; null when inputs are unsuitable or the sector is financial services
+     * @nullable
+     */
   fairValueEstimate?: number | null;
   categoryScores: CategoryScores;
   topFactors: Factor[];
@@ -158,28 +165,44 @@ export interface CategoryDetail {
   metrics: MetricDetail[];
 }
 
+export type DcfAssumptionsDiscountRateType = typeof DcfAssumptionsDiscountRateType[keyof typeof DcfAssumptionsDiscountRateType];
+
+
+export const DcfAssumptionsDiscountRateType = {
+  cost_of_equity: 'cost_of_equity',
+  legacy_wacc: 'legacy_wacc',
+} as const;
+
 export interface DcfAssumptions {
-  /** Company-specific CAPM-derived discount rate */
-  wacc: number;
+  /** CAPM-derived cost of equity used to discount equity cash flow */
+  discountRate: number;
+  discountRateType: DcfAssumptionsDiscountRateType;
   terminalGrowthRate: number;
   projectionYears: number;
   riskFreeRate?: number;
   equityRiskPremium?: number;
   beta?: number;
-  initialGrowthRate?: number;
+  /**
+     * Initial FCF growth proxy based on revenue growth
+     * @nullable
+     */
+  initialGrowthRate?: number | null;
   terminalYearGrowthRate?: number;
 }
 
+/**
+ * Screening rating based on the model score; not a trade recommendation
+ */
 export type ScoreDetailsRecommendation = typeof ScoreDetailsRecommendation[keyof typeof ScoreDetailsRecommendation];
 
 
 export const ScoreDetailsRecommendation = {
-  strong_buy: 'strong_buy',
-  buy: 'buy',
-  hold: 'hold',
-  reduce: 'reduce',
-  sell: 'sell',
-  strong_short: 'strong_short',
+  very_positive: 'very_positive',
+  positive: 'positive',
+  neutral: 'neutral',
+  negative: 'negative',
+  very_negative: 'very_negative',
+  extremely_negative: 'extremely_negative',
 } as const;
 
 export type ScoreDetailsConfidenceLevel = typeof ScoreDetailsConfidenceLevel[keyof typeof ScoreDetailsConfidenceLevel];
@@ -194,15 +217,19 @@ export const ScoreDetailsConfidenceLevel = {
 export interface ScoreDetails {
   ticker: string;
   overallScore: number;
+  /** Screening rating based on the model score; not a trade recommendation */
   recommendation: ScoreDetailsRecommendation;
   confidence: number;
   confidenceLevel: ScoreDetailsConfidenceLevel;
   confidenceBreakdown: ConfidenceBreakdown;
   scoreRange: ScoreRange;
-  /** Score shrunk toward neutral for uncertainty; drives the recommendation */
+  /** Score shrunk toward neutral for uncertainty; drives the screening rating */
   adjustedScore: number;
   dataCoverage: number;
-  /** @nullable */
+  /**
+     * Illustrative equity DCF estimate; null when inputs are unsuitable or the sector is financial services
+     * @nullable
+     */
   fairValueEstimate?: number | null;
   categoryScores: CategoryScores;
   categories: CategoryDetail[];
@@ -215,6 +242,7 @@ export interface ScoreDetails {
 
 export interface PricePoint {
   date: string;
+  /** Adjusted close when the provider supplies one; otherwise raw close */
   close: number;
   volume: number;
 }
@@ -231,11 +259,35 @@ export interface ScoringConfigInput {
      * @nullable
      */
   sector: string | null;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
   valuationWeight: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
   financialHealthWeight: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
   profitabilityWeight: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
   growthWeight: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
   riskWeight: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
   momentumWeight: number;
 }
 
@@ -252,16 +304,19 @@ export interface ScoringConfig {
   updatedAt: string;
 }
 
+/**
+ * Screening rating based on the model score; not a trade recommendation
+ */
 export type RankingItemRecommendation = typeof RankingItemRecommendation[keyof typeof RankingItemRecommendation];
 
 
 export const RankingItemRecommendation = {
-  strong_buy: 'strong_buy',
-  buy: 'buy',
-  hold: 'hold',
-  reduce: 'reduce',
-  sell: 'sell',
-  strong_short: 'strong_short',
+  very_positive: 'very_positive',
+  positive: 'positive',
+  neutral: 'neutral',
+  negative: 'negative',
+  very_negative: 'very_negative',
+  extremely_negative: 'extremely_negative',
 } as const;
 
 export type RankingItemConfidenceLevel = typeof RankingItemConfidenceLevel[keyof typeof RankingItemConfidenceLevel];
@@ -280,6 +335,9 @@ export interface RankingItem {
   /** @nullable */
   sector: string | null;
   overallScore: number;
+  /** Score shrunk toward neutral for uncertainty; used to order rankings */
+  adjustedScore: number;
+  /** Screening rating based on the model score; not a trade recommendation */
   recommendation: RankingItemRecommendation;
   confidence: number;
   confidenceLevel?: RankingItemConfidenceLevel;

@@ -47,16 +47,14 @@ function formatRecommendation(rec: string) {
 }
 
 function getRecommendationVariant(rec: string): "buy" | "sell" | "hold" {
-  if (rec.includes("buy")) return "buy";
-  if (rec.includes("sell") || rec.includes("short") || rec.includes("reduce"))
-    return "sell";
+  if (rec.includes("positive")) return "buy";
+  if (rec.includes("negative")) return "sell";
   return "hold";
 }
 
 function getRecommendationColor(rec: string) {
-  if (rec.includes("buy")) return "text-buy";
-  if (rec.includes("sell") || rec.includes("short") || rec.includes("reduce"))
-    return "text-sell";
+  if (rec.includes("positive")) return "text-buy";
+  if (rec.includes("negative")) return "text-sell";
   return "text-hold";
 }
 
@@ -73,7 +71,7 @@ const CONFIDENCE_COMPONENTS: {
   label: string;
 }[] = [
   { key: "dataCoverage", label: "Data" },
-  { key: "metricDiversity", label: "Diversity" },
+  { key: "metricDiversity", label: "Weight balance" },
   { key: "dataQuality", label: "Quality" },
   { key: "benchmarkQuality", label: "Benchmarks" },
   { key: "historyQuality", label: "History" },
@@ -234,10 +232,10 @@ function QuantScoreDial({
         </div>
       </div>
 
-      {/* 95% interval: the model cannot claim more precision. */}
+      {/* Indicative range; not a calibrated statistical interval. */}
       {score?.scoreRange && (
         <div className="text-xs font-mono text-muted-foreground mb-4">
-          Likely range {Math.round(score.scoreRange.low)}–
+          Indicative range {Math.round(score.scoreRange.low)}–
           {Math.round(score.scoreRange.high)}
         </div>
       )}
@@ -670,17 +668,25 @@ export default function StockScore() {
                         Assumptions
                       </CardTitle>
                       <CardDescription>
-                        Variables used to compute the Fair Value Estimate
+                        Illustrative equity DCF using Yahoo FCF and revenue
+                        growth as a proxy; estimate is omitted for financial
+                        services and is not a calibrated valuation.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div className="p-4 bg-card rounded-lg border shadow-sm">
                           <div className="text-sm text-muted-foreground mb-1">
-                            Cost of Capital (WACC)
+                            {details.dcfAssumptions.discountRateType ===
+                            "legacy_wacc"
+                              ? "Legacy WACC (cached)"
+                              : "Cost of Equity"}
                           </div>
                           <div className="text-xl font-bold font-mono">
-                            {(details.dcfAssumptions.wacc * 100).toFixed(1)}%
+                            {(
+                              details.dcfAssumptions.discountRate * 100
+                            ).toFixed(1)}
+                            %
                           </div>
                           {/* CAPM build-up, so the discount rate is auditable. */}
                           <div className="text-[10px] text-muted-foreground/70 mt-1">
@@ -715,7 +721,7 @@ export default function StockScore() {
                           </div>
                           {details.dcfAssumptions.initialGrowthRate != null && (
                             <div className="text-[10px] text-muted-foreground/70 mt-1">
-                              Growth fades{" "}
+                              Revenue-growth proxy fades{" "}
                               {(
                                 details.dcfAssumptions.initialGrowthRate * 100
                               ).toFixed(1)}

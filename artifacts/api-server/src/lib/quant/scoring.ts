@@ -14,7 +14,7 @@ import {
 import {
   INVALID_SCORE,
   coverage,
-  diversity,
+  weightBalance,
   linearScore,
   logRatioScore,
   maxDrawdown,
@@ -28,7 +28,12 @@ import {
 export { round } from "./statistics";
 
 export type Recommendation =
-  "strong_buy" | "buy" | "hold" | "reduce" | "sell" | "strong_short";
+  | "very_positive"
+  | "positive"
+  | "neutral"
+  | "negative"
+  | "very_negative"
+  | "extremely_negative";
 
 interface CategoryScores {
   valuation: number;
@@ -61,20 +66,21 @@ export interface CategoryDetail {
   metrics: MetricDetail[];
   /** Share of the category's intended weight that had usable data, 0-1. */
   coverage: number;
-  /** Standard deviation of the category score, in score points. */
+  /** Heuristic standard deviation of the category score, in score points. */
   volatility: number;
 }
 
 export interface DcfAssumptions {
-  wacc: number;
+  discountRate: number;
+  discountRateType: "cost_of_equity" | "legacy_wacc";
   terminalGrowthRate: number;
   projectionYears: number;
-  /** Discount rate build-up, so the WACC is auditable rather than magic. */
+  /** Discount-rate build-up, so the rate is auditable rather than magic. */
   riskFreeRate: number;
   equityRiskPremium: number;
   beta: number;
   /** Initial (year-1) growth applied to free cash flow. */
-  initialGrowthRate: number;
+  initialGrowthRate: number | null;
   /** Growth rate assumed once the fade period ends. */
   terminalYearGrowthRate: number;
 }
@@ -88,7 +94,7 @@ export interface CategoryWeights {
   momentumWeight: number;
 }
 
-/** Point estimate plus the 95% interval the score is knowable to. */
+/** Point estimate plus an indicative model-uncertainty band. */
 export interface ScoreRange {
   low: number;
   high: number;
@@ -98,7 +104,7 @@ export interface ScoreRange {
 export interface ConfidenceBreakdown {
   /** Importance-weighted share of the model that had usable data. */
   dataCoverage: number;
-  /** How independent the available metrics are of each other, 0-1. */
+  /** Legacy field: how evenly available metric weights are distributed, 0-1. */
   metricDiversity: number;
   /** Data freshness and internal consistency of the snapshot. */
   dataQuality: number;
@@ -219,6 +225,25 @@ function coverageShrink(coverageValue: number): number {
   return Math.pow(Math.max(0, Math.min(1, coverageValue)), 0.7);
 }
 
+export function isValidCategoryWeights(weights: CategoryWeights): boolean {
+  const values = [
+    weights.valuationWeight,
+    weights.financialHealthWeight,
+    weights.profitabilityWeight,
+    weights.growthWeight,
+    weights.riskWeight,
+    weights.momentumWeight,
+  ];
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return (
+    values.every(
+      (value) => Number.isFinite(value) && value >= 0 && value <= 1,
+    ) &&
+    total > 0 &&
+    Math.abs(total - 1) <= 0.02
+  );
+}
+
 /**
  * Aggregate a category, renormalising over available metrics and shrinking the
  * result toward neutral in proportion to how much of the model had data.
@@ -232,13 +257,15 @@ function aggregateCategory(
   const raw = weightedMean(items);
   const shrink = coverageShrink(cov);
   const band = scoreBand(items, METRIC_NOISE, MODEL_ERROR / 2);
+  const metricSigma = (band.high - band.low) / (2 * 1.96);
+  const missingDataSigma = (1 - cov) * 25;
   return {
     category,
     weight: 0,
     score: clampScore(50 + (raw - 50) * shrink),
     metrics,
     coverage: cov,
-    volatility: (band.high - band.low) / 2,
+    volatility: Math.sqrt((metricSigma * shrink) ** 2 + missingDataSigma ** 2),
   };
 }
 
@@ -247,17 +274,19 @@ function aggregateCategory(
 export function scoreValuation(
   fin: FinancialSnapshot,
   bench: SectorBenchmark,
+  sector: string | null = null,
 ): CategoryDetail {
+  const financialSector = isFinancialSector(sector);
   const metrics = [
-    ratioMetric("peRatio", "P/E Ratio", fin.peRatio, bench.peRatio, false, 1),
+    ratioMetric("peRatio", "P/E Ratio", fin.peRatio, bench.peRatio, false, 0.4),
     ratioMetric("pbRatio", "P/B Ratio", fin.pbRatio, bench.pbRatio, false, 0.8),
     ratioMetric(
       "evEbitda",
       "EV/EBITDA",
-      fin.evEbitda,
+      financialSector ? null : fin.evEbitda,
       bench.evEbitda,
       false,
-      0.9,
+      0.3,
     ),
     ratioMetric(
       "pegRatio",
@@ -265,49 +294,42 @@ export function scoreValuation(
       fin.pegRatio,
       bench.pegRatio,
       false,
-      0.7,
+      0.3,
     ),
   ];
   return aggregateCategory("valuation", metrics);
 }
 
-// FCF is scored as FCF margin and FCF yield rather than absolute FCF, which
-// is not comparable across company sizes.
 export function scoreFinancialHealth(
   fin: FinancialSnapshot,
   profile: StockProfile,
 ): CategoryDetail {
-  const fcfMargin =
-    fin.freeCashflow != null && fin.totalRevenue != null && fin.totalRevenue > 0
-      ? (fin.freeCashflow / fin.totalRevenue) * 100
+  const financialSector = isFinancialSector(profile.sector);
+  const fcfConversion =
+    !financialSector &&
+    fin.freeCashflow != null &&
+    fin.netIncome != null &&
+    fin.netIncome > 0
+      ? (fin.freeCashflow / fin.netIncome) * 100
       : null;
 
   const fcfYield =
+    !financialSector &&
     fin.freeCashflow != null &&
     profile.marketCap != null &&
     profile.marketCap > 0
       ? (fin.freeCashflow / profile.marketCap) * 100
       : null;
 
-  // Scale-free cash generation. FCF margin is benchmarked against a
-  // net-margin-derived reference; FCF yield against a market-wide 4%.
-  const fcfMarginBench = netMarginReference(fin);
+  // Yahoo free cash flow divided by net income is a cash-conversion proxy.
+  const FCF_CONVERSION_BENCHMARK = 80;
   const FCF_YIELD_BENCHMARK = 4;
 
   const metrics = [
     percentMetric(
-      "debtToEquity",
-      "Debt / Equity",
-      fin.debtToEquity,
-      0.6,
-      false,
-      1,
-      DISPERSION.ratio,
-    ),
-    percentMetric(
       "currentRatio",
       "Current Ratio",
-      fin.currentRatio,
+      financialSector ? null : fin.currentRatio,
       1.5,
       true,
       0.7,
@@ -316,19 +338,19 @@ export function scoreFinancialHealth(
     percentMetric(
       "quickRatio",
       "Quick Ratio",
-      fin.quickRatio,
+      financialSector ? null : fin.quickRatio,
       1.0,
       true,
       0.5,
       LIQUIDITY_DISPERSION,
     ),
     percentMetric(
-      "fcfMargin",
-      "FCF Margin (%)",
-      fcfMargin,
-      fcfMarginBench,
+      "fcfConversion",
+      "Free Cash Flow / Net Income (%)",
+      fcfConversion,
+      FCF_CONVERSION_BENCHMARK,
       true,
-      1,
+      0.7,
     ),
     percentMetric(
       "fcfYield",
@@ -336,30 +358,23 @@ export function scoreFinancialHealth(
       fcfYield,
       FCF_YIELD_BENCHMARK,
       true,
-      0.8,
+      0.7,
       4,
     ),
   ];
   return aggregateCategory("financialHealth", metrics);
 }
 
-// Not in the sector table (which predates this metric), so approximate it from
-// the company's own net margin: a business converting little of its profit to
-// cash then scores below its own norm.
-function netMarginReference(fin: FinancialSnapshot): number {
-  if (fin.netMargin != null && Number.isFinite(fin.netMargin)) {
-    return Math.min(Math.max(fin.netMargin, 2), 25);
-  }
-  return 8;
+function isFinancialSector(sector: string | null): boolean {
+  return sector?.trim().toLowerCase() === "financial services";
 }
 
-// ROE carries the largest weight: it already embeds margin, turnover, leverage.
 function scoreProfitability(
   fin: FinancialSnapshot,
   bench: SectorBenchmark,
 ): CategoryDetail {
   const metrics = [
-    percentMetric("roe", "Return on Equity (%)", fin.roe, bench.roe, true, 1.2),
+    percentMetric("roe", "Return on Equity (%)", fin.roe, bench.roe, true, 0.8),
     percentMetric("roa", "Return on Assets (%)", fin.roa, bench.roa, true, 1),
     percentMetric(
       "grossMargin",
@@ -367,7 +382,7 @@ function scoreProfitability(
       fin.grossMargin,
       bench.grossMargin,
       true,
-      0.7,
+      0.6,
       15,
     ),
     percentMetric(
@@ -376,7 +391,7 @@ function scoreProfitability(
       fin.operatingMargin,
       bench.operatingMargin,
       true,
-      1,
+      0.8,
       10,
     ),
     percentMetric(
@@ -385,7 +400,7 @@ function scoreProfitability(
       fin.netMargin,
       bench.netMargin,
       true,
-      0.9,
+      0.6,
       8,
     ),
   ];
@@ -423,6 +438,7 @@ export function scoreRisk(
   fin: FinancialSnapshot,
   bench: SectorBenchmark,
   priceHistory: PricePoint[],
+  sector: string | null = null,
 ): CategoryDetail {
   const closes = priceHistory.map((p) => p.close).filter((c) => c > 0);
   const vol = realisedVolatility(closes);
@@ -442,7 +458,12 @@ export function scoreRisk(
     percentMetric(
       "debtToEquity",
       "Debt / Equity",
-      fin.debtToEquity,
+      isFinancialSector(sector) ||
+        fin.debtToEquity == null ||
+        !Number.isFinite(fin.debtToEquity) ||
+        fin.debtToEquity < 0
+        ? null
+        : fin.debtToEquity,
       bench.debtToEquity,
       false,
       1,
@@ -504,16 +525,16 @@ export function scoreMomentum(
   }
 
   const metrics = [
-    ratioMetric("vs50DayAvg", "Price vs 50-Day Avg", vs50, 1.0, true, 1),
-    ratioMetric("vs200DayAvg", "Price vs 200-Day Avg", vs200, 1.0, true, 1),
-    ratioMetric("vsYearHigh", "Price vs 52-Week High", vsHigh, 1.0, true, 0.8),
+    ratioMetric("vs50DayAvg", "Price vs 50-Day Avg", vs50, 1.0, true, 0.25),
+    ratioMetric("vs200DayAvg", "Price vs 200-Day Avg", vs200, 1.0, true, 0.25),
+    ratioMetric("vsYearHigh", "Price vs 52-Week High", vsHigh, 1.0, true, 0.5),
     percentMetric(
       "return6m",
       "6-Month Return (%)",
       return6m,
       0,
       true,
-      0.9,
+      0.5,
       MOMENTUM_DISPERSION,
     ),
   ];
@@ -524,7 +545,7 @@ export interface CategoryComputation {
   categories: CategoryDetail[];
   categoryScores: CategoryScores;
   overallScore: number;
-  /** 95% interval around the overall score. */
+  /** Indicative model-uncertainty band around the overall score. */
   scoreRange: ScoreRange;
   /** Importance-weighted coverage of the whole model, 0-1. */
   coverage: number;
@@ -536,13 +557,19 @@ export function computeCategories(
   weights: CategoryWeights,
   priceHistory: PricePoint[] = [],
 ): CategoryComputation {
+  if (!isValidCategoryWeights(weights)) {
+    throw new RangeError(
+      "Category weights must be finite values from 0 to 1 and sum to 1.0",
+    );
+  }
+
   const bench = getSectorBenchmark(profile.sector);
 
-  const valuation = scoreValuation(fin, bench);
+  const valuation = scoreValuation(fin, bench, profile.sector);
   const financialHealth = scoreFinancialHealth(fin, profile);
   const profitability = scoreProfitability(fin, bench);
   const growth = scoreGrowth(fin);
-  const risk = scoreRisk(fin, bench, priceHistory);
+  const risk = scoreRisk(fin, bench, priceHistory, profile.sector);
   const momentum = scoreMomentum(profile, fin, priceHistory);
 
   valuation.weight = weights.valuationWeight;
@@ -575,13 +602,13 @@ export function computeCategories(
     categories.reduce((sum, c) => sum + c.score * c.weight, 0) / totalWeight,
   );
 
-  // Uncertainty on the overall score, propagated from each category's own
-  // dispersion plus a cross-category model-error term.
-  const weightedItems: WeightedScore[] = categories.map((c) => ({
-    score: c.score,
-    weight: c.weight,
-  }));
-  const band = scoreBand(weightedItems, METRIC_NOISE, MODEL_ERROR);
+  // Heuristic uncertainty propagation; this is not a calibrated statistical
+  // confidence interval.
+  const variance = categories.reduce((sum, category) => {
+    const weight = category.weight / totalWeight;
+    return sum + weight * weight * category.volatility * category.volatility;
+  }, MODEL_ERROR * MODEL_ERROR);
+  const margin = 1.96 * Math.sqrt(variance);
 
   const overallCoverage =
     categories.reduce((sum, c) => sum + c.coverage * c.weight, 0) / totalWeight;
@@ -591,8 +618,8 @@ export function computeCategories(
     categoryScores,
     overallScore,
     scoreRange: {
-      low: clampScore(overallScore + band.low),
-      high: clampScore(overallScore + band.high),
+      low: clampScore(overallScore - margin),
+      high: clampScore(overallScore + margin),
     },
     coverage: overallCoverage,
   };
@@ -608,18 +635,42 @@ export function confidenceLevel(score: number): ConfidenceLevel {
 }
 
 export function recommendationFromScore(score: number): Recommendation {
-  if (score >= 80) return "strong_buy";
-  if (score >= 65) return "buy";
-  if (score >= 45) return "hold";
-  if (score >= 30) return "reduce";
-  if (score >= 15) return "sell";
-  return "strong_short";
+  if (score >= 80) return "very_positive";
+  if (score >= 65) return "positive";
+  if (score >= 45) return "neutral";
+  if (score >= 30) return "negative";
+  if (score >= 15) return "very_negative";
+  return "extremely_negative";
+}
+
+export function normalizeRecommendation(value: string): Recommendation {
+  const legacy: Record<string, Recommendation> = {
+    strong_buy: "very_positive",
+    buy: "positive",
+    hold: "neutral",
+    reduce: "negative",
+    sell: "very_negative",
+    strong_short: "extremely_negative",
+  };
+  if (
+    value === "very_positive" ||
+    value === "positive" ||
+    value === "neutral" ||
+    value === "negative" ||
+    value === "very_negative" ||
+    value === "extremely_negative"
+  ) {
+    return value;
+  }
+  const normalized = legacy[value];
+  if (normalized) return normalized;
+  throw new Error(`Unknown scoring recommendation: ${value}`);
 }
 
 /**
  * Shrink a score toward neutral in proportion to uncertainty. At confidence 100
- * the score is untouched; at 0 it collapses to 50, which maps to "Hold" rather
- * than labelling a thinly-evidenced stock "Strong Buy".
+ * the score is untouched; at 0 it collapses to 50, which maps to a neutral
+ * screening rating rather than overstating a thinly evidenced signal.
  */
 export function shrinkToConfidence(score: number, confidence: number): number {
   const c = Math.max(0, Math.min(100, confidence)) / 100;
@@ -629,7 +680,7 @@ export function shrinkToConfidence(score: number, confidence: number): number {
 // Coverage dominates: it reflects how much of the model had data behind it.
 const CONFIDENCE_WEIGHTS = {
   dataCoverage: 0.4,
-  metricDiversity: 0.15,
+  metricWeightBalance: 0.15,
   dataQuality: 0.15,
   benchmarkQuality: 0.1,
   historyQuality: 0.2,
@@ -744,10 +795,10 @@ export function computeConfidence(
 
   const totalCategoryWeight =
     categories.reduce((sum, c) => sum + c.weight, 0) || 1;
-  const metricDiversity =
+  const metricWeightBalance =
     categories.length > 0
       ? categories.reduce(
-          (acc, c) => acc + diversity(toWeighted(c.metrics)) * c.weight,
+          (acc, c) => acc + weightBalance(toWeighted(c.metrics)) * c.weight,
           0,
         ) / totalCategoryWeight
       : 0.5;
@@ -762,7 +813,7 @@ export function computeConfidence(
 
   const breakdown: ConfidenceBreakdown = {
     dataCoverage: round(dataCoverage, 3),
-    metricDiversity: round(metricDiversity, 3),
+    metricDiversity: round(metricWeightBalance, 3),
     dataQuality: round(dataQuality, 3),
     benchmarkQuality: round(benchmarkQuality, 3),
     historyQuality: round(historyQuality, 3),
@@ -776,7 +827,7 @@ export function computeConfidence(
   // Already weighted, and summing to at most (1 - dataCoverage), so the bracket
   // tops out at exactly 1.0 when every component is maximal.
   const gated =
-    metricDiversity * CONFIDENCE_WEIGHTS.metricDiversity +
+    metricWeightBalance * CONFIDENCE_WEIGHTS.metricWeightBalance +
     dataQuality * CONFIDENCE_WEIGHTS.dataQuality +
     benchmarkQuality * CONFIDENCE_WEIGHTS.benchmarkQuality +
     historyQuality * CONFIDENCE_WEIGHTS.historyQuality;
@@ -786,9 +837,6 @@ export function computeConfidence(
   return { score: round(clampScore(score * 100), 1), breakdown };
 }
 
-// WACC is derived per company from CAPM rather than fixed for everyone:
-// discounting a low-beta utility at the same rate as a high-beta smallcap
-// systematically overstates the former's fair value.
 const RISK_FREE_RATE = 0.065; // India 10Y government bond, approximate
 const EQUITY_RISK_PREMIUM = 0.055; // mature-market ERP
 const COUNTRY_RISK_PREMIUM = 0.015; // India country risk
@@ -800,10 +848,11 @@ const FADE_YEARS = 10;
 // tendency of raw betas to understate systematic risk.
 const BLUME_BETA_WEIGHT = 1 / 3;
 
-// Cost of equity via CAPM: rf + beta * ERP + country risk premium, blended with
-// after-tax cost of debt at market weights derived from debt-to-equity.
-function computeWacc(fin: FinancialSnapshot): {
-  wacc: number;
+// Yahoo free cash flow is operating cash flow less capex, so it is treated as
+// an equity-cash-flow proxy and discounted at cost of equity, without a second
+// debt/cash adjustment.
+function computeCostOfEquity(fin: FinancialSnapshot): {
+  discountRate: number;
   beta: number;
 } {
   const rawBeta =
@@ -811,67 +860,56 @@ function computeWacc(fin: FinancialSnapshot): {
 
   // Yahoo reports implausibly low betas for Indian NSE large caps (observed
   // 0.11-0.40 for RELIANCE/TCS/INFY/HDFCBANK, none of which are low-risk
-  // businesses). Taking them at face value produced a WACC near or below the
-  // risk-free rate, overstating fair value. The Blume adjustment pulls them
-  // back toward the market.
+  // businesses). Taking them at face value produced a cost of equity close to
+  // the risk-free rate, overstating fair value. The Blume adjustment pulls
+  // them back toward the market.
   const beta = BLUME_BETA_WEIGHT * rawBeta + (1 - BLUME_BETA_WEIGHT) * 1.0;
 
   const costOfEquity =
     RISK_FREE_RATE + beta * EQUITY_RISK_PREMIUM + COUNTRY_RISK_PREMIUM;
 
-  // Market-value weights from debt-to-equity (E = 1, D = d/e).
-  const de =
-    fin.debtToEquity != null && fin.debtToEquity > 0 ? fin.debtToEquity : 0;
-  const equityWeight = 1 / (1 + de);
-  const debtWeight = de / (1 + de);
-  // Pre-tax cost of debt approximated from the risk-free rate plus a spread
-  // that widens with leverage.
-  const costOfDebt = RISK_FREE_RATE + 0.015 + Math.min(de, 3) * 0.01;
-  const afterTaxCostOfDebt = costOfDebt * (1 - 0.25);
-
-  const blended = equityWeight * costOfEquity + debtWeight * afterTaxCostOfDebt;
-
-  // Keep the spread over terminal growth wide enough for the Gordon model to
-  // stay numerically sane; below ~3% the terminal value explodes. Also never
-  // discount below the risk-free rate, which would imply less risk than
-  // holding government bonds.
-  const wacc = Math.min(
-    Math.max(blended, TERMINAL_GROWTH_RATE + 0.03, RISK_FREE_RATE + 0.01),
+  // Keep a minimum spread over terminal growth to avoid an unstable Gordon
+  // value. This remains an approximate, fixed-rate assumption.
+  const discountRate = Math.min(
+    Math.max(costOfEquity, TERMINAL_GROWTH_RATE + 0.03),
     0.25,
   );
-  return { wacc, beta };
+  return { discountRate, beta };
 }
 
 function buildDcfAssumptions(
   fin: FinancialSnapshot,
-  growthRate: number,
+  growthRate: number | null,
 ): DcfAssumptions {
-  const { wacc, beta } = computeWacc(fin);
+  const { discountRate, beta } = computeCostOfEquity(fin);
   return {
-    wacc: round(wacc, 4),
+    discountRate: round(discountRate, 4),
+    discountRateType: "cost_of_equity",
     terminalGrowthRate: TERMINAL_GROWTH_RATE,
     projectionYears: FADE_YEARS,
     riskFreeRate: RISK_FREE_RATE,
     equityRiskPremium: EQUITY_RISK_PREMIUM,
     beta: round(beta, 2),
-    initialGrowthRate: round(growthRate, 4),
+    initialGrowthRate: growthRate == null ? null : round(growthRate, 4),
     terminalYearGrowthRate: TERMINAL_GROWTH_RATE,
   };
 }
 
 /**
- * Two-stage DCF fair value, per spec §4: FCF growth fades linearly from the
- * current rate to terminal, then a Gordon terminal value applies. The old
- * single-stage model held growth flat and let terminal value dominate, making
- * the output hypersensitive to the growth input.
+ * Two-stage equity DCF. Revenue growth is only a proxy for FCF growth because
+ * the provider does not supply a reliable FCF-growth history.
  *
  * Still a directional anchor, not a precise valuation.
  */
 export function estimateFairValue(
   fin: FinancialSnapshot,
   growthRatePercent: number | null,
+  sector: string | null = null,
 ): number | null {
   if (
+    isFinancialSector(sector) ||
+    growthRatePercent == null ||
+    !Number.isFinite(growthRatePercent) ||
     fin.freeCashflow == null ||
     fin.freeCashflow <= 0 ||
     fin.sharesOutstanding == null ||
@@ -880,12 +918,12 @@ export function estimateFairValue(
     return null;
   }
 
-  // Clamp growth to a defensible band; keep it below WACC throughout.
-  const { wacc } = computeWacc(fin);
+  // Clamp the revenue-growth proxy; keep it below the discount rate.
+  const { discountRate } = computeCostOfEquity(fin);
   const terminal = TERMINAL_GROWTH_RATE;
   const growthRate = Math.min(
-    Math.max((growthRatePercent ?? 8) / 100, -0.1),
-    Math.min(0.25, wacc - 0.02),
+    Math.max(growthRatePercent / 100, -0.1),
+    Math.min(0.25, discountRate - 0.02),
   );
 
   const fcf = fin.freeCashflow;
@@ -897,18 +935,13 @@ export function estimateFairValue(
     const fade = 1 - (year - 1) / FADE_YEARS;
     const yearGrowth = terminal + (growthRate - terminal) * fade;
     cashflow *= 1 + yearGrowth;
-    pv += cashflow / (1 + wacc) ** year;
+    pv += cashflow / (1 + discountRate) ** year;
   }
 
   const terminalValue =
-    (cashflow * (1 + terminal)) / Math.max(wacc - terminal, 0.01);
-  const pvTerminal = terminalValue / (1 + wacc) ** FADE_YEARS;
-
-  const enterpriseValue = pv + pvTerminal;
-  const equityValue =
-    enterpriseValue + (fin.totalCash ?? 0) - (fin.totalDebt ?? 0);
-
-  const fairValue = equityValue / fin.sharesOutstanding;
+    (cashflow * (1 + terminal)) / Math.max(discountRate - terminal, 0.01);
+  const pvTerminal = terminalValue / (1 + discountRate) ** FADE_YEARS;
+  const fairValue = (pv + pvTerminal) / fin.sharesOutstanding;
   return Number.isFinite(fairValue) && fairValue > 0
     ? round(fairValue, 2)
     : null;
@@ -920,10 +953,13 @@ export function getDcfAssumptions(
   fin: FinancialSnapshot,
   growthRatePercent: number | null,
 ): DcfAssumptions {
-  const { wacc } = computeWacc(fin);
+  const { discountRate } = computeCostOfEquity(fin);
+  if (growthRatePercent == null || !Number.isFinite(growthRatePercent)) {
+    return buildDcfAssumptions(fin, null);
+  }
   const growthRate = Math.min(
-    Math.max((growthRatePercent ?? 8) / 100, -0.1),
-    Math.min(0.25, wacc - 0.02),
+    Math.max(growthRatePercent / 100, -0.1),
+    Math.min(0.25, discountRate - 0.02),
   );
   return buildDcfAssumptions(fin, growthRate);
 }

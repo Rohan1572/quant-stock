@@ -28,7 +28,7 @@ export const scoreResultsTable = pgTable(
     confidenceLevel: text("confidence_level"),
     // Per-component drivers behind `confidence`, making it explainable.
     confidenceBreakdown: jsonb("confidence_breakdown"),
-    // { low, high } 95% interval around overall_score.
+    // { low, high } indicative model-uncertainty band around overall_score.
     scoreRange: jsonb("score_range"),
     // Score shrunk toward neutral for uncertainty; drives the recommendation.
     adjustedScore: real("adjusted_score"),

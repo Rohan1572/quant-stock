@@ -10,6 +10,7 @@ export * from './categoryDetail';
 export * from './categoryScores';
 export * from './confidenceBreakdown';
 export * from './dcfAssumptions';
+export * from './dcfAssumptionsDiscountRateType';
 export * from './errorResponse';
 export * from './factor';
 export * from './factorDirection';

@@ -4,6 +4,7 @@ import { logger } from "../logger";
 import { YahooFinanceAdapter, type DataProvider } from "./provider";
 import { fetchScoringInputs } from "./scoringInputs";
 import { singleFlight } from "./singleFlight";
+import { resolveScoreCache } from "./scoreCachePolicy";
 import {
   computeCategories,
   computeConfidence,
@@ -13,9 +14,11 @@ import {
   confidenceLevel,
   shrinkToConfidence,
   round,
+  normalizeRecommendation,
   type CategoryWeights,
   type ConfidenceBreakdown,
   type ConfidenceLevel,
+  type DcfAssumptions,
   type ScoreRange,
 } from "./scoring";
 import { buildExplanation, buildTopFactors, buildRiskFlags } from "./explain";
@@ -85,7 +88,7 @@ export interface ComputedScore {
   confidenceLevel: ConfidenceLevel;
   /** Per-component drivers behind `confidence`. */
   confidenceBreakdown: ConfidenceBreakdown;
-  /** 95% interval around `overallScore`. */
+  /** Indicative model-uncertainty band around `overallScore`. */
   scoreRange: ScoreRange;
   /** Shrunk toward neutral for uncertainty; drives the recommendation. */
   adjustedScore: number;
@@ -102,8 +105,11 @@ export interface ComputedScore {
 }
 
 async function computeFreshScore(ticker: string): Promise<ComputedScore> {
-  const { profile, financialSnapshot: fin, priceHistory } =
-    await fetchScoringInputs(provider, ticker);
+  const {
+    profile,
+    financialSnapshot: fin,
+    priceHistory,
+  } = await fetchScoringInputs(provider, ticker);
   const snapshot = fin ?? EMPTY_SNAPSHOT;
 
   const weights = await getWeightsForSector(profile.sector);
@@ -121,15 +127,20 @@ async function computeFreshScore(ticker: string): Promise<ComputedScore> {
   // evidence cannot produce a confident buy call.
   const adjustedScore = round(shrinkToConfidence(overallScore, confidence), 1);
   const recommendation = recommendationFromScore(adjustedScore);
-  const fairValueEstimate = estimateFairValue(snapshot, snapshot.revenueGrowth);
+  const fairValueEstimate = estimateFairValue(
+    snapshot,
+    snapshot.revenueGrowth,
+    profile.sector,
+  );
   const explanation = buildExplanation(
     profile,
     categories,
     overallScore,
+    adjustedScore,
     recommendation,
   );
   const topFactors = buildTopFactors(categories);
-  const riskFlags = buildRiskFlags(snapshot, categories);
+  const riskFlags = buildRiskFlags(snapshot, categories, profile.sector);
 
   return {
     ticker,
@@ -188,9 +199,7 @@ const EMPTY_SNAPSHOT = {
 
 export function getScore(ticker: string): Promise<ComputedScore> {
   const normalized = ticker.toUpperCase();
-  return singleFlight(scoreRequests, normalized, () =>
-    loadScore(normalized),
-  );
+  return singleFlight(scoreRequests, normalized, () => loadScore(normalized));
 }
 
 async function loadScore(normalized: string): Promise<ComputedScore> {
@@ -200,69 +209,69 @@ async function loadScore(normalized: string): Promise<ComputedScore> {
     .where(eq(scoreResultsTable.ticker, normalized))
     .limit(1);
 
-  if (cached && Date.now() - cached.computedAt.getTime() < SCORE_CACHE_TTL_MS) {
-    return rowToComputedScore(cached);
-  }
-
-  let fresh: ComputedScore;
-  try {
-    fresh = await computeFreshScore(normalized);
-  } catch (err) {
-    if (cached) {
-      // Upstream provider hiccup — serve the stale cache rather than fail.
+  return resolveScoreCache({
+    cached: cached
+      ? {
+          value: cached,
+          computedAt: cached.computedAt,
+          dcfAssumptions: cached.dcfAssumptions,
+        }
+      : null,
+    now: Date.now(),
+    ttlMs: SCORE_CACHE_TTL_MS,
+    compute: () => computeFreshScore(normalized),
+    mapCached: rowToComputedScore,
+    onStale: (err) => {
       logger.warn(
         { err, ticker: normalized },
         "Score recompute failed, serving stale cache",
       );
-      return rowToComputedScore(cached);
-    }
-    throw err;
-  }
-
-  await db
-    .insert(scoreResultsTable)
-    .values({
-      ticker: normalized,
-      computedAt: fresh.computedAt,
-      overallScore: fresh.overallScore,
-      recommendation: fresh.recommendation,
-      confidence: fresh.confidence,
-      confidenceLevel: fresh.confidenceLevel,
-      confidenceBreakdown: fresh.confidenceBreakdown,
-      scoreRange: fresh.scoreRange,
-      adjustedScore: fresh.adjustedScore,
-      dataCoverage: fresh.dataCoverage,
-      fairValueEstimate: fresh.fairValueEstimate,
-      categoryScores: fresh.categoryScores,
-      categories: fresh.categories,
-      topFactors: fresh.topFactors,
-      riskFlags: fresh.riskFlags,
-      explanation: fresh.explanation,
-      dcfAssumptions: fresh.dcfAssumptions,
-    })
-    .onConflictDoUpdate({
-      target: scoreResultsTable.ticker,
-      set: {
-        computedAt: fresh.computedAt,
-        overallScore: fresh.overallScore,
-        recommendation: fresh.recommendation,
-        confidence: fresh.confidence,
-        confidenceLevel: fresh.confidenceLevel,
-        confidenceBreakdown: fresh.confidenceBreakdown,
-        scoreRange: fresh.scoreRange,
-        adjustedScore: fresh.adjustedScore,
-        dataCoverage: fresh.dataCoverage,
-        fairValueEstimate: fresh.fairValueEstimate,
-        categoryScores: fresh.categoryScores,
-        categories: fresh.categories,
-        topFactors: fresh.topFactors,
-        riskFlags: fresh.riskFlags,
-        explanation: fresh.explanation,
-        dcfAssumptions: fresh.dcfAssumptions,
-      },
-    });
-
-  return fresh;
+    },
+    persist: async (fresh) => {
+      await db
+        .insert(scoreResultsTable)
+        .values({
+          ticker: normalized,
+          computedAt: fresh.computedAt,
+          overallScore: fresh.overallScore,
+          recommendation: fresh.recommendation,
+          confidence: fresh.confidence,
+          confidenceLevel: fresh.confidenceLevel,
+          confidenceBreakdown: fresh.confidenceBreakdown,
+          scoreRange: fresh.scoreRange,
+          adjustedScore: fresh.adjustedScore,
+          dataCoverage: fresh.dataCoverage,
+          fairValueEstimate: fresh.fairValueEstimate,
+          categoryScores: fresh.categoryScores,
+          categories: fresh.categories,
+          topFactors: fresh.topFactors,
+          riskFlags: fresh.riskFlags,
+          explanation: fresh.explanation,
+          dcfAssumptions: fresh.dcfAssumptions,
+        })
+        .onConflictDoUpdate({
+          target: scoreResultsTable.ticker,
+          set: {
+            computedAt: fresh.computedAt,
+            overallScore: fresh.overallScore,
+            recommendation: fresh.recommendation,
+            confidence: fresh.confidence,
+            confidenceLevel: fresh.confidenceLevel,
+            confidenceBreakdown: fresh.confidenceBreakdown,
+            scoreRange: fresh.scoreRange,
+            adjustedScore: fresh.adjustedScore,
+            dataCoverage: fresh.dataCoverage,
+            fairValueEstimate: fresh.fairValueEstimate,
+            categoryScores: fresh.categoryScores,
+            categories: fresh.categories,
+            topFactors: fresh.topFactors,
+            riskFlags: fresh.riskFlags,
+            explanation: fresh.explanation,
+            dcfAssumptions: fresh.dcfAssumptions,
+          },
+        });
+    },
+  });
 }
 
 function rowToComputedScore(row: {
@@ -287,26 +296,99 @@ function rowToComputedScore(row: {
   // Rows predating the score-range columns fall back to a degenerate band at the
   // score so old cached rows still render.
   const range = row.scoreRange as ScoreRange | null;
+  const dcf = normalizeDcfAssumptions(row.dcfAssumptions);
+  const recommendation = normalizeRecommendation(row.recommendation);
+  const adjustedScore = row.adjustedScore ?? row.overallScore;
+  const categories = row.categories as ComputedScore["categories"];
+  const riskFlags = row.riskFlags as string[];
+  const explanation = dcf.legacy
+    ? buildExplanation(
+        {
+          ticker: row.ticker,
+          companyName: row.ticker,
+          sector: null,
+          industry: null,
+          marketCap: null,
+          currency: "INR",
+          price: null,
+          changePercent: null,
+        },
+        categories,
+        row.overallScore,
+        adjustedScore,
+        recommendation,
+      )
+    : (row.explanation as ComputedScore["explanation"]);
   return {
     ticker: row.ticker,
     overallScore: row.overallScore,
-    recommendation: row.recommendation as ComputedScore["recommendation"],
+    recommendation,
     confidence: row.confidence,
     confidenceLevel: (row.confidenceLevel ??
       "moderate") as ComputedScore["confidenceLevel"],
     confidenceBreakdown:
       (row.confidenceBreakdown as ConfidenceBreakdown) ?? EMPTY_BREAKDOWN,
     scoreRange: range ?? { low: row.overallScore, high: row.overallScore },
-    adjustedScore: row.adjustedScore ?? row.overallScore,
+    adjustedScore,
     dataCoverage: row.dataCoverage ?? 0,
-    fairValueEstimate: row.fairValueEstimate,
+    fairValueEstimate: dcf.legacy ? null : row.fairValueEstimate,
     categoryScores: row.categoryScores as ComputedScore["categoryScores"],
-    categories: row.categories as ComputedScore["categories"],
+    categories,
     topFactors: row.topFactors as ComputedScore["topFactors"],
-    riskFlags: row.riskFlags as string[],
-    explanation: row.explanation as ComputedScore["explanation"],
-    dcfAssumptions: row.dcfAssumptions as ComputedScore["dcfAssumptions"],
+    riskFlags: dcf.legacy
+      ? [
+          ...riskFlags,
+          "Cached score predates the current scoring method; the DCF estimate is withheld.",
+        ]
+      : riskFlags,
+    explanation,
+    dcfAssumptions: dcf.assumptions,
     computedAt: row.computedAt,
+  };
+}
+
+function normalizeDcfAssumptions(value: unknown): {
+  assumptions: DcfAssumptions;
+  legacy: boolean;
+} {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Cached DCF assumptions are invalid");
+  }
+  const row = value as Record<string, unknown>;
+  const legacy =
+    typeof row.discountRate !== "number" ||
+    row.discountRateType === "legacy_wacc";
+  const discountRate =
+    typeof row.discountRate === "number" ? row.discountRate : row.wacc;
+  const discountRateType = legacy ? "legacy_wacc" : row.discountRateType;
+  if (
+    typeof discountRate !== "number" ||
+    (discountRateType !== "cost_of_equity" &&
+      discountRateType !== "legacy_wacc") ||
+    typeof row.terminalGrowthRate !== "number" ||
+    typeof row.projectionYears !== "number" ||
+    typeof row.riskFreeRate !== "number" ||
+    typeof row.equityRiskPremium !== "number" ||
+    typeof row.beta !== "number" ||
+    (row.initialGrowthRate !== null &&
+      typeof row.initialGrowthRate !== "number") ||
+    typeof row.terminalYearGrowthRate !== "number"
+  ) {
+    throw new Error("Cached DCF assumptions are incomplete");
+  }
+  return {
+    assumptions: {
+      discountRate,
+      discountRateType,
+      terminalGrowthRate: row.terminalGrowthRate,
+      projectionYears: row.projectionYears,
+      riskFreeRate: row.riskFreeRate,
+      equityRiskPremium: row.equityRiskPremium,
+      beta: row.beta,
+      initialGrowthRate: row.initialGrowthRate,
+      terminalYearGrowthRate: row.terminalYearGrowthRate,
+    },
+    legacy,
   };
 }
 

@@ -8,6 +8,7 @@
 
 export interface PricePoint {
   date: Date;
+  /** Adjusted close when the provider supplies one; otherwise raw close */
   close: number;
   volume: number;
 }

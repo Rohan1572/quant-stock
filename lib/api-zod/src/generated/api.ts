@@ -27,13 +27,14 @@ export const GetRankingsResponse = zod.object({
   "companyName": zod.string(),
   "sector": zod.string().nullable(),
   "overallScore": zod.number(),
-  "recommendation": zod.enum(['strong_buy', 'buy', 'hold', 'reduce', 'sell', 'strong_short']),
+  "adjustedScore": zod.number().describe('Score shrunk toward neutral for uncertainty; used to order rankings'),
+  "recommendation": zod.enum(['very_positive', 'positive', 'neutral', 'negative', 'very_negative', 'extremely_negative']).describe('Screening rating based on the model score; not a trade recommendation'),
   "confidence": zod.number(),
   "confidenceLevel": zod.enum(['low', 'moderate', 'high']).optional(),
   "scoreRange": zod.object({
   "low": zod.number(),
   "high": zod.number()
-}).optional().describe('95% interval around the score. The model cannot claim more precision than this; a wide band means the point estimate should not be read literally.'),
+}).optional().describe('Indicative model-uncertainty band. It is not a calibrated statistical confidence interval; a wide band means the point estimate should not be read literally.'),
   "computedAt": zod.coerce.date()
 })),
   "total": zod.number().int().describe('Total tickers in the watchlist'),
@@ -102,12 +103,12 @@ export const GetStockScoreParams = zod.object({
 export const GetStockScoreResponse = zod.object({
   "ticker": zod.string(),
   "overallScore": zod.number(),
-  "recommendation": zod.enum(['strong_buy', 'buy', 'hold', 'reduce', 'sell', 'strong_short']),
+  "recommendation": zod.enum(['very_positive', 'positive', 'neutral', 'negative', 'very_negative', 'extremely_negative']).describe('Screening rating based on the model score; not a trade recommendation'),
   "confidence": zod.number(),
   "confidenceLevel": zod.enum(['low', 'moderate', 'high']),
   "confidenceBreakdown": zod.object({
   "dataCoverage": zod.number().describe('Importance-weighted share of the model that had usable data'),
-  "metricDiversity": zod.number().describe('How independent the available metrics are of each other'),
+  "metricDiversity": zod.number().describe('Legacy field measuring how evenly available metric weights are distributed. It does not estimate statistical independence.'),
   "dataQuality": zod.number().describe('Data freshness and internal consistency of the snapshot'),
   "benchmarkQuality": zod.number().describe('Whether a sector-specific benchmark was available'),
   "historyQuality": zod.number().describe('Sufficiency, recency and variety of the price history')
@@ -115,10 +116,10 @@ export const GetStockScoreResponse = zod.object({
   "scoreRange": zod.object({
   "low": zod.number(),
   "high": zod.number()
-}).describe('95% interval around the score. The model cannot claim more precision than this; a wide band means the point estimate should not be read literally.'),
-  "adjustedScore": zod.number().describe('Score shrunk toward neutral for uncertainty; drives the recommendation'),
+}).describe('Indicative model-uncertainty band. It is not a calibrated statistical confidence interval; a wide band means the point estimate should not be read literally.'),
+  "adjustedScore": zod.number().describe('Score shrunk toward neutral for uncertainty; drives the screening rating'),
   "dataCoverage": zod.number(),
-  "fairValueEstimate": zod.number().nullish(),
+  "fairValueEstimate": zod.number().nullish().describe('Illustrative equity DCF estimate; null when inputs are unsuitable or the sector is financial services'),
   "categoryScores": zod.object({
   "valuation": zod.number(),
   "financialHealth": zod.number(),
@@ -151,12 +152,12 @@ export const GetStockScoreDetailsParams = zod.object({
 export const GetStockScoreDetailsResponse = zod.object({
   "ticker": zod.string(),
   "overallScore": zod.number(),
-  "recommendation": zod.enum(['strong_buy', 'buy', 'hold', 'reduce', 'sell', 'strong_short']),
+  "recommendation": zod.enum(['very_positive', 'positive', 'neutral', 'negative', 'very_negative', 'extremely_negative']).describe('Screening rating based on the model score; not a trade recommendation'),
   "confidence": zod.number(),
   "confidenceLevel": zod.enum(['low', 'moderate', 'high']),
   "confidenceBreakdown": zod.object({
   "dataCoverage": zod.number().describe('Importance-weighted share of the model that had usable data'),
-  "metricDiversity": zod.number().describe('How independent the available metrics are of each other'),
+  "metricDiversity": zod.number().describe('Legacy field measuring how evenly available metric weights are distributed. It does not estimate statistical independence.'),
   "dataQuality": zod.number().describe('Data freshness and internal consistency of the snapshot'),
   "benchmarkQuality": zod.number().describe('Whether a sector-specific benchmark was available'),
   "historyQuality": zod.number().describe('Sufficiency, recency and variety of the price history')
@@ -164,10 +165,10 @@ export const GetStockScoreDetailsResponse = zod.object({
   "scoreRange": zod.object({
   "low": zod.number(),
   "high": zod.number()
-}).describe('95% interval around the score. The model cannot claim more precision than this; a wide band means the point estimate should not be read literally.'),
-  "adjustedScore": zod.number().describe('Score shrunk toward neutral for uncertainty; drives the recommendation'),
+}).describe('Indicative model-uncertainty band. It is not a calibrated statistical confidence interval; a wide band means the point estimate should not be read literally.'),
+  "adjustedScore": zod.number().describe('Score shrunk toward neutral for uncertainty; drives the screening rating'),
   "dataCoverage": zod.number(),
-  "fairValueEstimate": zod.number().nullish(),
+  "fairValueEstimate": zod.number().nullish().describe('Illustrative equity DCF estimate; null when inputs are unsuitable or the sector is financial services'),
   "categoryScores": zod.object({
   "valuation": zod.number(),
   "financialHealth": zod.number(),
@@ -205,13 +206,14 @@ export const GetStockScoreDetailsResponse = zod.object({
   "risks": zod.array(zod.string())
 }),
   "dcfAssumptions": zod.object({
-  "wacc": zod.number().describe('Company-specific CAPM-derived discount rate'),
+  "discountRate": zod.number().describe('CAPM-derived cost of equity used to discount equity cash flow'),
+  "discountRateType": zod.enum(['cost_of_equity', 'legacy_wacc']),
   "terminalGrowthRate": zod.number(),
   "projectionYears": zod.number().int(),
   "riskFreeRate": zod.number().optional(),
   "equityRiskPremium": zod.number().optional(),
   "beta": zod.number().optional(),
-  "initialGrowthRate": zod.number().optional(),
+  "initialGrowthRate": zod.number().nullish().describe('Initial FCF growth proxy based on revenue growth'),
   "terminalYearGrowthRate": zod.number().optional()
 }),
   "computedAt": zod.coerce.date()
@@ -231,7 +233,7 @@ export const GetStockHistoryResponse = zod.object({
   "range": zod.string(),
   "points": zod.array(zod.object({
   "date": zod.coerce.date(),
-  "close": zod.number(),
+  "close": zod.number().describe('Adjusted close when the provider supplies one; otherwise raw close'),
   "volume": zod.number()
 }))
 })
@@ -257,14 +259,34 @@ export const ListScoringConfigsResponse = zod.array(ListScoringConfigsResponseIt
 /**
  * @summary Create or update the category weights for the platform default or a specific sector
  */
+export const upsertScoringConfigBodyValuationWeightMin = 0;
+export const upsertScoringConfigBodyValuationWeightMax = 1;
+
+export const upsertScoringConfigBodyFinancialHealthWeightMin = 0;
+export const upsertScoringConfigBodyFinancialHealthWeightMax = 1;
+
+export const upsertScoringConfigBodyProfitabilityWeightMin = 0;
+export const upsertScoringConfigBodyProfitabilityWeightMax = 1;
+
+export const upsertScoringConfigBodyGrowthWeightMin = 0;
+export const upsertScoringConfigBodyGrowthWeightMax = 1;
+
+export const upsertScoringConfigBodyRiskWeightMin = 0;
+export const upsertScoringConfigBodyRiskWeightMax = 1;
+
+export const upsertScoringConfigBodyMomentumWeightMin = 0;
+export const upsertScoringConfigBodyMomentumWeightMax = 1;
+
+
+
 export const UpsertScoringConfigBody = zod.object({
   "sector": zod.string().nullable().describe('Sector name this override applies to, or null for the platform default'),
-  "valuationWeight": zod.number(),
-  "financialHealthWeight": zod.number(),
-  "profitabilityWeight": zod.number(),
-  "growthWeight": zod.number(),
-  "riskWeight": zod.number(),
-  "momentumWeight": zod.number()
+  "valuationWeight": zod.number().min(upsertScoringConfigBodyValuationWeightMin).max(upsertScoringConfigBodyValuationWeightMax),
+  "financialHealthWeight": zod.number().min(upsertScoringConfigBodyFinancialHealthWeightMin).max(upsertScoringConfigBodyFinancialHealthWeightMax),
+  "profitabilityWeight": zod.number().min(upsertScoringConfigBodyProfitabilityWeightMin).max(upsertScoringConfigBodyProfitabilityWeightMax),
+  "growthWeight": zod.number().min(upsertScoringConfigBodyGrowthWeightMin).max(upsertScoringConfigBodyGrowthWeightMax),
+  "riskWeight": zod.number().min(upsertScoringConfigBodyRiskWeightMin).max(upsertScoringConfigBodyRiskWeightMax),
+  "momentumWeight": zod.number().min(upsertScoringConfigBodyMomentumWeightMin).max(upsertScoringConfigBodyMomentumWeightMax)
 })
 
 export const UpsertScoringConfigResponse = zod.object({

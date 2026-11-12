@@ -6,11 +6,9 @@ import {
   TickerNotFoundError,
 } from "../src/lib/quant/scoringInputs";
 import { singleFlight } from "../src/lib/quant/singleFlight";
+import { TransientProviderError } from "../src/lib/quant/providerErrors";
 import type { DataProvider, StockProfile } from "../src/lib/quant/provider";
-import {
-  yahooChart,
-  yahooQuoteSummary,
-} from "../src/lib/quant/yahooClient";
+import { yahooChart, yahooQuoteSummary } from "../src/lib/quant/yahooClient";
 
 const TEST_PROFILE: StockProfile = {
   ticker: "TEST.NS",
@@ -82,10 +80,7 @@ describe("score input fetching", () => {
       },
     );
 
-    await assert.rejects(
-      fetchScoringInputs(provider, "TEST.NS"),
-      historyError,
-    );
+    await assert.rejects(fetchScoringInputs(provider, "TEST.NS"), historyError);
   });
 });
 
@@ -181,12 +176,12 @@ describe("Yahoo quote-summary request coalescing", () => {
     };
 
     try {
-      const [first, second] = await Promise.all([
-        yahooQuoteSummary("RETRY.NS"),
-        yahooQuoteSummary("retry.ns"),
+      const failures = await Promise.all([
+        yahooQuoteSummary("RETRY.NS").catch((error: unknown) => error),
+        yahooQuoteSummary("retry.ns").catch((error: unknown) => error),
       ]);
-      assert.equal(first, null);
-      assert.equal(second, null);
+      assert.ok(failures[0] instanceof TransientProviderError);
+      assert.equal(failures[0], failures[1]);
       assert.equal(quoteSummaryRequests, 1);
 
       shouldFail = false;
@@ -202,15 +197,23 @@ describe("Yahoo chart request coalescing", () => {
   it("shares concurrent history requests for the same ticker and range", async () => {
     const originalFetch = globalThis.fetch;
     let chartRequests = 0;
+    let requestedAdjustedClose = false;
     globalThis.fetch = async (input) => {
       if (String(input).includes("/v8/finance/chart/")) {
         chartRequests++;
+        requestedAdjustedClose =
+          new URL(String(input)).searchParams.get("includeAdjustedClose") ===
+          "true";
         return Response.json({
           chart: {
             result: [
               {
                 timestamp: [1_762_992_000],
-                indicators: { quote: [{ close: [42], volume: [100] }] },
+                indicators: {
+                  quote: [{ close: [42], volume: [100] }],
+                  adjclose:
+                    chartRequests === 1 ? [{ adjclose: [40] }] : undefined,
+                },
               },
             ],
           },
@@ -226,9 +229,12 @@ describe("Yahoo chart request coalescing", () => {
       ]);
       assert.deepEqual(first, second);
       assert.equal(chartRequests, 1);
+      assert.equal(requestedAdjustedClose, true);
+      assert.equal(first[0].close, 40, "uses adjusted close for price history");
 
-      await yahooChart("TEST.NS", "1y");
+      const rawCloseFallback = await yahooChart("TEST.NS", "1y");
       assert.equal(chartRequests, 2);
+      assert.equal(rawCloseFallback[0].close, 42);
     } finally {
       globalThis.fetch = originalFetch;
     }

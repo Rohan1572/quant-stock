@@ -124,12 +124,10 @@ export function coverage(items: WeightedScore[]): number {
 }
 
 /**
- * Effective independent sample size of a weighted metric set, normalised to
- * 0-1 by metric count (inverse-Simpson index). Several valuation metrics are
- * functions of the same earnings figure, so three "available" ones carry far
- * less information than three unrelated ones. Lands at 1 when weights are equal.
+ * Balance of available metric weights, normalised to 0-1. This measures weight
+ * concentration only; it does not estimate statistical independence.
  */
-export function diversity(items: WeightedScore[]): number {
+export function weightBalance(items: WeightedScore[]): number {
   const usable = items.filter((i) => i.weight > 0 && Number.isFinite(i.score));
   const n = usable.length;
   if (n <= 1) return 0;
@@ -145,9 +143,8 @@ export function diversity(items: WeightedScore[]): number {
 }
 
 /**
- * Propagate per-metric uncertainty into a symmetric score interval: independent
- * metric errors on the aggregate, plus a floor for model error the metrics
- * cannot capture. An honest "72 +/- 9" beats a spurious point estimate of 72.
+ * Build a symmetric model band from assumed metric noise and model error.
+ * This is a heuristic band, not a statistically calibrated confidence interval.
  *
  * @param noisePerScore standard deviation, in score points, of one metric's score
  */

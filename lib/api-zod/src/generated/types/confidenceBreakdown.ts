@@ -12,7 +12,7 @@
 export interface ConfidenceBreakdown {
   /** Importance-weighted share of the model that had usable data */
   dataCoverage: number;
-  /** How independent the available metrics are of each other */
+  /** Legacy field measuring how evenly available metric weights are distributed. It does not estimate statistical independence. */
   metricDiversity: number;
   /** Data freshness and internal consistency of the snapshot */
   dataQuality: number;

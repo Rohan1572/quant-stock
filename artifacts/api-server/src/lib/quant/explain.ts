@@ -26,6 +26,7 @@ export function buildExplanation(
   profile: StockProfile,
   categories: CategoryDetail[],
   overallScore: number,
+  adjustedScore: number,
   recommendation: Recommendation,
 ): ScoreExplanation {
   const strong = categories.filter((c) => c.score >= 65);
@@ -38,8 +39,15 @@ export function buildExplanation(
   const risks: string[] = [];
 
   const recLabel = RECOMMENDATION_LABELS[recommendation];
+  const hasUsableData = categories.some((c) => c.coverage > 0);
   reasons.push(
-    `${profile.companyName} scores ${Math.round(overallScore)}/100 overall, putting it in "${recLabel}" territory.`,
+    hasUsableData
+      ? `${profile.companyName} has a raw score of ${Math.round(
+          overallScore,
+        )}/100 and an uncertainty-adjusted score of ${Math.round(
+          adjustedScore,
+        )}/100, a ${recLabel} screening rating.`
+      : `${profile.companyName} does not have enough usable data for a meaningful scoring rating.`,
   );
 
   for (const cat of strong.slice(0, 3)) {
@@ -72,9 +80,9 @@ export function buildExplanation(
     );
   }
 
-  if (reasons.length === 1) {
+  if (hasUsableData && reasons.length === 1) {
     reasons.push(
-      "No single category stands out strongly — the score reflects a broadly average profile across valuation, health, profitability, growth, risk, and momentum.",
+      "No measured category stands out strongly; the available evidence is broadly balanced across the model.",
     );
   }
 
@@ -92,12 +100,12 @@ export function buildExplanation(
 }
 
 const RECOMMENDATION_LABELS: Record<Recommendation, string> = {
-  strong_buy: "Strong Buy",
-  buy: "Buy",
-  hold: "Hold",
-  reduce: "Reduce",
-  sell: "Sell",
-  strong_short: "Strong Short",
+  very_positive: "Very Positive",
+  positive: "Positive",
+  neutral: "Neutral",
+  negative: "Negative",
+  very_negative: "Very Negative",
+  extremely_negative: "Extremely Negative",
 };
 
 function topMetricLabel(cat: CategoryDetail): string {
@@ -132,19 +140,21 @@ export function buildTopFactors(categories: CategoryDetail[]): Factor[] {
 export function buildRiskFlags(
   fin: FinancialSnapshot,
   categories: CategoryDetail[],
+  sector: string | null = null,
 ): string[] {
   const flags: string[] = [];
+  const financialSector = sector?.trim().toLowerCase() === "financial services";
 
-  if (fin.debtToEquity != null && fin.debtToEquity > 1.5) {
+  if (!financialSector && fin.debtToEquity != null && fin.debtToEquity > 1.5) {
     flags.push("High leverage: debt-to-equity ratio exceeds 1.5x.");
   }
-  if (fin.currentRatio != null && fin.currentRatio < 1) {
+  if (!financialSector && fin.currentRatio != null && fin.currentRatio < 1) {
     flags.push("Liquidity risk: current ratio is below 1.0.");
   }
   if (fin.beta != null && fin.beta > 1.5 && fin.beta < 3) {
     flags.push("High volatility: beta is above 1.5.");
   }
-  if (fin.freeCashflow != null && fin.freeCashflow < 0) {
+  if (!financialSector && fin.freeCashflow != null && fin.freeCashflow < 0) {
     flags.push("Negative free cash flow.");
   }
 

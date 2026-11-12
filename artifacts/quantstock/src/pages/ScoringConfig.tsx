@@ -55,10 +55,10 @@ const configSchema = z
         data.riskWeight +
         data.momentumWeight;
       // allow small floating point variance
-      return Math.abs(sum - 1.0) < 0.01;
+      return Math.abs(sum - 1.0) <= 0.02;
     },
     {
-      message: "Weights must exactly sum to 1.0",
+      message: "Weights must sum to 1.0 (within 0.02)",
       path: ["valuationWeight"], // attach error to first field
     },
   );
@@ -216,7 +216,7 @@ export default function ScoringConfig() {
               </CardTitle>
               <CardDescription>
                 Weights are represented as decimals (e.g., 0.25 = 25%) and must
-                sum exactly to 1.0.
+                sum to 1.0 within 0.02.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
@@ -320,7 +320,7 @@ export default function ScoringConfig() {
                   <div className="flex items-center gap-4 text-sm font-medium">
                     <span className="text-muted-foreground">Total Sum:</span>
                     <span
-                      className={`font-mono text-lg ${Math.abs(currentSum - 1.0) < 0.01 ? "text-buy" : "text-destructive"}`}
+                      className={`font-mono text-lg ${Math.abs(currentSum - 1.0) <= 0.02 ? "text-buy" : "text-destructive"}`}
                     >
                       {currentSum.toFixed(2)}
                     </span>

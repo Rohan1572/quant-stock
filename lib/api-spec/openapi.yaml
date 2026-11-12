@@ -347,7 +347,16 @@ components:
           type: number
         recommendation:
           type: string
-          enum: [strong_buy, buy, hold, reduce, sell, strong_short]
+          enum:
+            [
+              very_positive,
+              positive,
+              neutral,
+              negative,
+              very_negative,
+              extremely_negative,
+            ]
+          description: Screening rating based on the model score; not a trade recommendation
         confidence:
           type: number
         confidenceLevel:
@@ -359,11 +368,12 @@ components:
           $ref: "#/components/schemas/ScoreRange"
         adjustedScore:
           type: number
-          description: Score shrunk toward neutral for uncertainty; drives the recommendation
+          description: Score shrunk toward neutral for uncertainty; drives the screening rating
         dataCoverage:
           type: number
         fairValueEstimate:
           type: ["number", "null"]
+          description: Illustrative equity DCF estimate; null when inputs are unsuitable or the sector is financial services
         categoryScores:
           $ref: "#/components/schemas/CategoryScores"
         topFactors:
@@ -384,8 +394,9 @@ components:
       type: object
       required: [low, high]
       description: >-
-        95% interval around the score. The model cannot claim more precision
-        than this; a wide band means the point estimate should not be read literally.
+        Indicative model-uncertainty band. It is not a calibrated statistical
+        confidence interval; a wide band means the point estimate should not be
+        read literally.
       properties:
         low:
           type: number
@@ -409,7 +420,9 @@ components:
           description: Importance-weighted share of the model that had usable data
         metricDiversity:
           type: number
-          description: How independent the available metrics are of each other
+          description: >-
+            Legacy field measuring how evenly available metric weights are
+            distributed. It does not estimate statistical independence.
         dataQuality:
           type: number
           description: Data freshness and internal consistency of the snapshot
@@ -482,11 +495,15 @@ components:
 
     DcfAssumptions:
       type: object
-      required: [wacc, terminalGrowthRate, projectionYears]
+      required:
+        [discountRate, discountRateType, terminalGrowthRate, projectionYears]
       properties:
-        wacc:
+        discountRate:
           type: number
-          description: Company-specific CAPM-derived discount rate
+          description: CAPM-derived cost of equity used to discount equity cash flow
+        discountRateType:
+          type: string
+          enum: [cost_of_equity, legacy_wacc]
         terminalGrowthRate:
           type: number
         projectionYears:
@@ -498,7 +515,8 @@ components:
         beta:
           type: number
         initialGrowthRate:
-          type: number
+          type: ["number", "null"]
+          description: Initial FCF growth proxy based on revenue growth
         terminalYearGrowthRate:
           type: number
 
@@ -530,7 +548,16 @@ components:
           type: number
         recommendation:
           type: string
-          enum: [strong_buy, buy, hold, reduce, sell, strong_short]
+          enum:
+            [
+              very_positive,
+              positive,
+              neutral,
+              negative,
+              very_negative,
+              extremely_negative,
+            ]
+          description: Screening rating based on the model score; not a trade recommendation
         confidence:
           type: number
         confidenceLevel:
@@ -542,11 +569,12 @@ components:
           $ref: "#/components/schemas/ScoreRange"
         adjustedScore:
           type: number
-          description: Score shrunk toward neutral for uncertainty; drives the recommendation
+          description: Score shrunk toward neutral for uncertainty; drives the screening rating
         dataCoverage:
           type: number
         fairValueEstimate:
           type: ["number", "null"]
+          description: Illustrative equity DCF estimate; null when inputs are unsuitable or the sector is financial services
         categoryScores:
           $ref: "#/components/schemas/CategoryScores"
         categories:
@@ -578,6 +606,7 @@ components:
           format: date
         close:
           type: number
+          description: Adjusted close when the provider supplies one; otherwise raw close
         volume:
           type: number
 
@@ -612,16 +641,28 @@ components:
           type: ["string", "null"]
         valuationWeight:
           type: number
+          minimum: 0
+          maximum: 1
         financialHealthWeight:
           type: number
+          minimum: 0
+          maximum: 1
         profitabilityWeight:
           type: number
+          minimum: 0
+          maximum: 1
         growthWeight:
           type: number
+          minimum: 0
+          maximum: 1
         riskWeight:
           type: number
+          minimum: 0
+          maximum: 1
         momentumWeight:
           type: number
+          minimum: 0
+          maximum: 1
 
     ScoringConfig:
       type: object
@@ -667,6 +708,7 @@ components:
           companyName,
           sector,
           overallScore,
+          adjustedScore,
           recommendation,
           confidence,
           computedAt,
@@ -682,9 +724,21 @@ components:
           type: ["string", "null"]
         overallScore:
           type: number
+        adjustedScore:
+          type: number
+          description: Score shrunk toward neutral for uncertainty; used to order rankings
         recommendation:
           type: string
-          enum: [strong_buy, buy, hold, reduce, sell, strong_short]
+          enum:
+            [
+              very_positive,
+              positive,
+              neutral,
+              negative,
+              very_negative,
+              extremely_negative,
+            ]
+          description: Screening rating based on the model score; not a trade recommendation
         confidence:
           type: number
         confidenceLevel:

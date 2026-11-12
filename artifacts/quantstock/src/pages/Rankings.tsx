@@ -39,9 +39,8 @@ function formatRecommendation(rec: string) {
 }
 
 function getRecSentiment(rec: string): "buy" | "hold" | "sell" {
-  if (rec.includes("buy")) return "buy";
-  if (rec.includes("sell") || rec.includes("short") || rec.includes("reduce"))
-    return "sell";
+  if (rec.includes("positive")) return "buy";
+  if (rec.includes("negative")) return "sell";
   return "hold";
 }
 
@@ -444,23 +443,24 @@ export default function Rankings() {
                       <div className="hidden sm:block">
                         <div className="flex items-center gap-2">
                           <Progress
-                            value={item.overallScore}
-                            indicatorColor={scoreColor(item.overallScore)}
+                            value={item.adjustedScore}
+                            indicatorColor={scoreColor(item.adjustedScore)}
                             className="h-2 flex-1 bg-secondary"
                           />
                           <span
-                            className={`font-mono font-bold text-sm w-7 shrink-0 text-right ${scoreTextColor(item.overallScore)}`}
+                            className={`font-mono font-bold text-sm w-7 shrink-0 text-right ${scoreTextColor(item.adjustedScore)}`}
                           >
-                            {Math.round(item.overallScore)}
+                            {Math.round(item.adjustedScore)}
                           </span>
                         </div>
                         <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
                           <span>Confidence {Math.round(item.confidence)}%</span>
+                          <span>Raw {Math.round(item.overallScore)}</span>
                           {/* The band stops a 1-point gap reading as meaningful. */}
                           {item.scoreRange && (
                             <span
                               className="font-mono"
-                              title="95% likely range around this score"
+                              title="Indicative model-uncertainty range around the raw score; not statistically calibrated"
                             >
                               ({Math.round(item.scoreRange.low)}–
                               {Math.round(item.scoreRange.high)})

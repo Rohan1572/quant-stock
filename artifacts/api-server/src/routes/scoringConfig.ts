@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, isNull } from "drizzle-orm";
 import { db, scoringConfigsTable } from "@workspace/db";
+import { isValidCategoryWeights } from "../lib/quant/scoring";
 import {
   ListScoringConfigsResponse,
   UpsertScoringConfigBody,
@@ -8,8 +9,6 @@ import {
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
-
-const WEIGHT_SUM_TOLERANCE = 0.02;
 
 router.get("/scoring-config", async (_req, res): Promise<void> => {
   const configs = await db.select().from(scoringConfigsTable);
@@ -24,17 +23,10 @@ router.post("/scoring-config", async (req, res): Promise<void> => {
   }
 
   const weights = parsed.data;
-  const total =
-    weights.valuationWeight +
-    weights.financialHealthWeight +
-    weights.profitabilityWeight +
-    weights.growthWeight +
-    weights.riskWeight +
-    weights.momentumWeight;
-
-  if (Math.abs(total - 1) > WEIGHT_SUM_TOLERANCE) {
+  if (!isValidCategoryWeights(weights)) {
     res.status(400).json({
-      error: `Category weights must sum to 1.0 (got ${total.toFixed(3)})`,
+      error:
+        "Each category weight must be between 0 and 1, and all weights must sum to 1.0.",
     });
     return;
   }

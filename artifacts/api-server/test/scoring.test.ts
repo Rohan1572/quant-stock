@@ -7,6 +7,8 @@ import {
   confidenceLevel,
   estimateFairValue,
   getDcfAssumptions,
+  isValidCategoryWeights,
+  normalizeRecommendation,
   recommendationFromScore,
   scoreFinancialHealth,
   scoreMomentum,
@@ -15,13 +17,14 @@ import {
   shrinkToConfidence,
 } from "../src/lib/quant/scoring";
 import { getSectorBenchmark } from "../src/lib/quant/sectorBenchmarks";
+import { buildExplanation, buildRiskFlags } from "../src/lib/quant/explain";
 import {
   coverage,
-  diversity,
   linearScore,
   logRatioScore,
   maxDrawdown,
   realisedVolatility,
+  weightBalance,
   weightedMean,
 } from "../src/lib/quant/statistics";
 import type {
@@ -67,13 +70,17 @@ function snapshot(
   };
 }
 
-function profile(price: number | null): StockProfile {
+function profile(
+  price: number | null,
+  marketCap = 1e12,
+  sector: string | null = "Technology",
+): StockProfile {
   return {
     ticker: "TEST.NS",
     companyName: "Test Co",
-    sector: "Technology",
+    sector,
     industry: null,
-    marketCap: 1e12,
+    marketCap,
     currency: "INR",
     price,
     changePercent: 0,
@@ -103,6 +110,44 @@ const DEFAULT_WEIGHTS = {
   riskWeight: 0.1,
   momentumWeight: 0.1,
 };
+
+describe("scoring configuration and labels", () => {
+  it("rejects negative, oversized, and incorrectly summed category weights", () => {
+    assert.equal(isValidCategoryWeights(DEFAULT_WEIGHTS), true);
+    assert.equal(
+      isValidCategoryWeights({ ...DEFAULT_WEIGHTS, valuationWeight: -0.1 }),
+      false,
+    );
+    assert.equal(
+      isValidCategoryWeights({ ...DEFAULT_WEIGHTS, valuationWeight: 1.1 }),
+      false,
+    );
+    assert.equal(
+      isValidCategoryWeights({ ...DEFAULT_WEIGHTS, valuationWeight: 0.1 }),
+      false,
+    );
+    assert.equal(
+      isValidCategoryWeights({
+        ...DEFAULT_WEIGHTS,
+        valuationWeight: Number.POSITIVE_INFINITY,
+      }),
+      false,
+    );
+    assert.throws(
+      () =>
+        computeCategories(profile(100), snapshot(), {
+          ...DEFAULT_WEIGHTS,
+          valuationWeight: -0.1,
+        }),
+      /Category weights must be finite/,
+    );
+  });
+
+  it("normalizes persisted action-oriented labels to screening ratings", () => {
+    assert.equal(normalizeRecommendation("strong_buy"), "very_positive");
+    assert.equal(normalizeRecommendation("strong_short"), "extremely_negative");
+  });
+});
 
 const FULL = {
   peRatio: 20,
@@ -344,7 +389,7 @@ describe("aggregation treats missing data honestly", () => {
     // The raw score used to map straight to a recommendation.
     it("prevents a low-confidence high score from becoming a buy call", () => {
       const adjusted = shrinkToConfidence(90, 10);
-      assert.equal(recommendationFromScore(adjusted), "hold");
+      assert.equal(recommendationFromScore(adjusted), "neutral");
       assert.ok(
         adjusted < 60,
         `expected shrinkage toward neutral, got ${adjusted}`,
@@ -354,14 +399,14 @@ describe("aggregation treats missing data honestly", () => {
     it("preserves the signal when confidence is high", () => {
       assert.equal(
         recommendationFromScore(shrinkToConfidence(90, 95)),
-        "strong_buy",
+        "very_positive",
       );
     });
 
     it("collapses to neutral at zero confidence", () => {
       assert.equal(shrinkToConfidence(95, 0), 50);
       assert.equal(shrinkToConfidence(5, 0), 50);
-      assert.equal(recommendationFromScore(50), "hold");
+      assert.equal(recommendationFromScore(50), "neutral");
     });
 
     it("is monotonic in confidence", () => {
@@ -394,6 +439,24 @@ describe("aggregation treats missing data honestly", () => {
       );
       assert.ok(result.coverage > 0 && result.coverage <= 1);
     });
+
+    it("widens the indicative band when scoring coverage is absent", () => {
+      const measured = computeCategories(
+        profile(120),
+        snapshot(FULL),
+        DEFAULT_WEIGHTS,
+        RISING,
+      );
+      const missing = computeCategories(
+        profile(120),
+        snapshot(),
+        DEFAULT_WEIGHTS,
+        [],
+      );
+      const measuredWidth = measured.scoreRange.high - measured.scoreRange.low;
+      const missingWidth = missing.scoreRange.high - missing.scoreRange.low;
+      assert.ok(missingWidth > measuredWidth);
+    });
   });
 
   describe("DCF discounting (regression)", () => {
@@ -408,7 +471,7 @@ describe("aggregation treats missing data honestly", () => {
 
     it("adjusts implausibly low published betas toward the market", () => {
       // Yahoo reports betas of ~0.11-0.40 for Indian NSE large caps, which put
-      // WACC near the risk-free rate and overstated fair value.
+      // The unadjusted value would make the equity discount rate implausibly low.
       const low = dcf(0.15);
       assert.ok(
         low.beta > 0.6,
@@ -419,8 +482,8 @@ describe("aggregation treats missing data honestly", () => {
     it("never discounts below the risk-free rate", () => {
       const zero = dcf(0.001);
       assert.ok(
-        zero.wacc > zero.riskFreeRate,
-        `WACC ${zero.wacc} must exceed risk-free ${zero.riskFreeRate}`,
+        zero.discountRate > zero.riskFreeRate,
+        `Discount rate ${zero.discountRate} must exceed risk-free ${zero.riskFreeRate}`,
       );
     });
 
@@ -428,18 +491,23 @@ describe("aggregation treats missing data honestly", () => {
       for (const beta of [0.1, 0.5, 1, 1.5, 2.5]) {
         const a = dcf(beta);
         assert.ok(
-          a.wacc > a.terminalGrowthRate + 0.02,
+          a.discountRate > a.terminalGrowthRate + 0.02,
           `beta ${beta}: spread too thin for the Gordon model`,
         );
       }
     });
 
     it("raises the discount rate as risk rises", () => {
-      assert.ok(dcf(1.8).wacc > dcf(0.6).wacc);
+      assert.ok(dcf(1.8).discountRate > dcf(0.6).discountRate);
     });
 
     it("returns null rather than a number without usable cash flow", () => {
       assert.equal(estimateFairValue(snapshot(), 10), null);
+      assert.equal(
+        estimateFairValue({ ...snapshot(), ...cashflows }, null),
+        null,
+        "missing revenue growth must not be replaced with a fabricated estimate",
+      );
       assert.equal(
         estimateFairValue(
           { ...snapshot(), ...cashflows, freeCashflow: -1 },
@@ -447,6 +515,17 @@ describe("aggregation treats missing data honestly", () => {
         ),
         null,
         "negative free cash flow has no Gordon value",
+      );
+    });
+
+    it("does not apply this cash-flow DCF to financial services", () => {
+      assert.equal(
+        estimateFairValue(
+          { ...snapshot(), ...cashflows },
+          10,
+          "Financial Services",
+        ),
+        null,
       );
     });
 
@@ -461,6 +540,20 @@ describe("aggregation treats missing data honestly", () => {
       );
       assert.ok(lowRisk !== null && highRisk !== null);
       assert.ok(lowRisk > highRisk, "less risk means more present value");
+    });
+
+    it("does not add debt and cash a second time to an equity cash-flow proxy", () => {
+      const base = estimateFairValue({ ...snapshot(), ...cashflows }, 10);
+      const alteredBalanceSheet = estimateFairValue(
+        {
+          ...snapshot(),
+          ...cashflows,
+          totalDebt: 9e9,
+          totalCash: 8e9,
+        },
+        10,
+      );
+      assert.equal(alteredBalanceSheet, base);
     });
   });
 
@@ -490,6 +583,37 @@ describe("aggregation treats missing data honestly", () => {
         assert.ok(metric);
         assert.equal(metric.available, false, `beta ${bad} should be rejected`);
       }
+    });
+
+    it("excludes negative debt-to-equity instead of rewarding negative equity", () => {
+      const metric = scoreRisk(
+        snapshot({ beta: 1, debtToEquity: -2, totalDebt: 100 }),
+        TECH,
+        RISING,
+      ).metrics.find((m) => m.key === "debtToEquity");
+      assert.ok(metric);
+      assert.equal(metric.available, false);
+    });
+
+    it("excludes leverage and EV/EBITDA metrics for financial services", () => {
+      const financialProfile = profile(100, 1e12, "Financial Services");
+      const valuation = scoreValuation(
+        snapshot({ peRatio: 12, pbRatio: 1.5, evEbitda: 8, pegRatio: 1 }),
+        getSectorBenchmark(financialProfile.sector),
+        financialProfile.sector,
+      );
+      const evEbitda = valuation.metrics.find((m) => m.key === "evEbitda");
+      assert.ok(evEbitda);
+      assert.equal(evEbitda.available, false);
+
+      const debt = scoreRisk(
+        snapshot({ beta: 1, debtToEquity: 3 }),
+        getSectorBenchmark(financialProfile.sector),
+        RISING,
+        financialProfile.sector,
+      ).metrics.find((m) => m.key === "debtToEquity");
+      assert.ok(debt);
+      assert.equal(debt.available, false);
     });
 
     it("computes volatility and drawdown with the expected sign", () => {
@@ -534,20 +658,20 @@ describe("aggregation treats missing data honestly", () => {
       assert.equal(weightedMean([{ score: Number.NaN, weight: 1 }]), 50);
     });
 
-    it("scores an independent metric set above a concentrated one", () => {
-      const balanced = diversity([
+    it("measures weight balance without claiming metric independence", () => {
+      const balanced = weightBalance([
         { score: 70, weight: 1 },
         { score: 70, weight: 1 },
         { score: 70, weight: 1 },
       ]);
-      const concentrated = diversity([
+      const concentrated = weightBalance([
         { score: 70, weight: 10 },
         { score: 70, weight: 1 },
         { score: 70, weight: 1 },
       ]);
       assert.ok(
         balanced > concentrated,
-        "correlated metrics add less information",
+        "balanced weights have a higher balance score",
       );
     });
   });
@@ -560,19 +684,61 @@ describe("aggregation treats missing data honestly", () => {
     });
   });
 
+  describe("score explanations", () => {
+    it("does not describe missing metrics as an average profile", () => {
+      const explanation = buildExplanation(profile(100), [], 50, 50, "neutral");
+      assert.match(explanation.reasons[0], /not have enough usable data/);
+      assert.doesNotMatch(explanation.reasons.join(" "), /broadly balanced/);
+    });
+
+    it("explains the raw and confidence-adjusted score separately", () => {
+      const explanation = buildExplanation(
+        profile(100),
+        [
+          {
+            category: "valuation",
+            weight: 1,
+            score: 80,
+            metrics: [],
+            coverage: 1,
+            volatility: 5,
+          },
+        ],
+        90,
+        54,
+        "neutral",
+      );
+      assert.match(explanation.reasons[0], /raw score of 90\/100/);
+      assert.match(explanation.reasons[0], /adjusted score of 54\/100/);
+      assert.match(explanation.reasons[0], /Neutral screening rating/);
+    });
+
+    it("does not apply operating-company risk flags to financial services", () => {
+      const flags = buildRiskFlags(
+        snapshot({
+          debtToEquity: 4,
+          currentRatio: 0.6,
+          freeCashflow: -1,
+        }),
+        [],
+        "Financial Services",
+      );
+      assert.deepEqual(flags, []);
+    });
+  });
+
   describe("financial health uses scale-free cash metrics", () => {
-    it("scores FCF margin and yield rather than absolute FCF", () => {
+    it("scores FCF conversion and yield rather than absolute FCF", () => {
       const keys = scoreFinancialHealth(
         snapshot({
           freeCashflow: 5e9,
-          totalRevenue: 1e11,
-          debtToEquity: 0.5,
+          netIncome: 6e9,
           currentRatio: 1.6,
           quickRatio: 1.1,
         }),
         profile(100),
       ).metrics.map((m) => m.key);
-      assert.ok(keys.includes("fcfMargin"));
+      assert.ok(keys.includes("fcfConversion"));
       assert.ok(keys.includes("fcfYield"));
       assert.ok(
         !keys.includes("freeCashflow"),
@@ -580,13 +746,36 @@ describe("aggregation treats missing data honestly", () => {
       );
     });
 
-    it("treats identical FCF differently at different company sizes", () => {
-      const marginOf = (revenue: number) =>
+    it("treats identical FCF differently at different market capitalisations", () => {
+      const yieldOf = (marketCap: number) =>
         scoreFinancialHealth(
-          snapshot({ freeCashflow: 1e8, totalRevenue: revenue }),
-          profile(100),
-        ).metrics.find((m) => m.key === "fcfMargin")?.score;
-      assert.notEqual(marginOf(1e9), marginOf(1e11));
+          snapshot({ freeCashflow: 1e8 }),
+          profile(100, marketCap),
+        ).metrics.find((m) => m.key === "fcfYield")?.score;
+      assert.notEqual(yieldOf(1e9), yieldOf(1e11));
+    });
+
+    it("uses a fixed FCF-conversion benchmark rather than the company's own margin", () => {
+      const metric = scoreFinancialHealth(
+        snapshot({ freeCashflow: 80, netIncome: 100, netMargin: 2 }),
+        profile(100),
+      ).metrics.find((m) => m.key === "fcfConversion");
+      assert.equal(metric?.sectorBenchmark, 80);
+      assert.equal(metric?.score, 50);
+    });
+
+    it("does not apply operating-company health metrics to financial services", () => {
+      const category = scoreFinancialHealth(
+        snapshot({
+          freeCashflow: 5e9,
+          netIncome: 6e9,
+          currentRatio: 1.6,
+          quickRatio: 1.1,
+        }),
+        profile(100, 1e12, "Financial Services"),
+      );
+      assert.equal(category.coverage, 0);
+      assert.ok(category.metrics.every((metric) => !metric.available));
     });
   });
   it("produces a non-zero-width band containing the point estimate", () => {

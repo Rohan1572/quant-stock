@@ -16,6 +16,9 @@ export interface RankingItem {
   /** @nullable */
   sector: string | null;
   overallScore: number;
+  /** Score shrunk toward neutral for uncertainty; used to order rankings */
+  adjustedScore: number;
+  /** Screening rating based on the model score; not a trade recommendation */
   recommendation: RankingItemRecommendation;
   confidence: number;
   confidenceLevel?: RankingItemConfidenceLevel;

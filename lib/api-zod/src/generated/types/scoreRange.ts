@@ -7,7 +7,7 @@
  */
 
 /**
- * 95% interval around the score. The model cannot claim more precision than this; a wide band means the point estimate should not be read literally.
+ * Indicative model-uncertainty band. It is not a calibrated statistical confidence interval; a wide band means the point estimate should not be read literally.
  */
 export interface ScoreRange {
   low: number;

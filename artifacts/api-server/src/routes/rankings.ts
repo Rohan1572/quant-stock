@@ -7,6 +7,7 @@ import {
 } from "@workspace/api-zod";
 import { WATCHLIST, getWatchlistEntry } from "../lib/quant/nifty100";
 import { getScore, TickerNotFoundError } from "../lib/quant/engine";
+import { normalizeRecommendation } from "../lib/quant/scoring";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -128,7 +129,8 @@ router.get("/rankings", async (_req, res): Promise<void> => {
         companyName: meta?.companyName ?? row.ticker,
         sector: meta?.sector ?? null,
         overallScore: row.overallScore,
-        recommendation: row.recommendation,
+        adjustedScore: row.adjustedScore ?? row.overallScore,
+        recommendation: normalizeRecommendation(row.recommendation),
         confidence: row.confidence,
         confidenceLevel: row.confidenceLevel,
         scoreRange: (row.scoreRange as {

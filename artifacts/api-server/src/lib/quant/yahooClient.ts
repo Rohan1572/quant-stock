@@ -1,5 +1,6 @@
 import { logger } from "../logger";
 import { singleFlight } from "./singleFlight";
+import { TransientProviderError } from "./providerErrors";
 
 // Thin, low-level client for Yahoo Finance's unofficial public endpoints.
 // This is a *prototype-tier* data source (see .local/skills — no SLA, can
@@ -25,14 +26,29 @@ const crumbRefreshRequests = new Map<
   Promise<{ cookie: string; crumb: string }>
 >();
 
-function fetchWithTimeout(
+async function fetchWithTimeout(
   url: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  return fetch(url, {
-    ...init,
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw new TransientProviderError(
+      "Yahoo Finance request could not be completed",
+      err,
+    );
+  }
+}
+
+function throwHttpError(status: number, url: string): never {
+  const message = `Yahoo Finance request failed: ${status} ${url}`;
+  if (status === 408 || status === 429 || status >= 500) {
+    throw new TransientProviderError(message);
+  }
+  throw new Error(message);
 }
 
 async function refreshCrumb(): Promise<{ cookie: string; crumb: string }> {
@@ -78,7 +94,7 @@ async function fetchJson(url: string): Promise<unknown> {
     headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
   });
   if (!res.ok) {
-    throw new Error(`Yahoo Finance request failed: ${res.status} ${url}`);
+    throwHttpError(res.status, url);
   }
   return res.json();
 }
@@ -107,7 +123,7 @@ async function fetchJsonWithCrumb(
     res = await attempt();
   }
   if (!res.ok) {
-    throw new Error(`Yahoo Finance request failed: ${res.status} ${baseUrl}`);
+    throwHttpError(res.status, baseUrl);
   }
   const body = (await res.json()) as { finance?: { error?: unknown } };
   if (body?.finance?.error) {
@@ -170,7 +186,7 @@ async function fetchYahooChart(
   const { range: yRange, interval } = RANGE_TO_YAHOO[range];
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
     ticker,
-  )}?range=${yRange}&interval=${interval}`;
+  )}?range=${yRange}&interval=${interval}&includeAdjustedClose=true`;
   const data = (await fetchJson(url)) as {
     chart?: {
       result?: Array<{
@@ -179,6 +195,9 @@ async function fetchYahooChart(
           quote?: Array<{
             close?: (number | null)[];
             volume?: (number | null)[];
+          }>;
+          adjclose?: Array<{
+            adjclose?: (number | null)[];
           }>;
         };
       }>;
@@ -191,10 +210,16 @@ async function fetchYahooChart(
   }
   const timestamps = result.timestamp ?? [];
   const closes = result.indicators?.quote?.[0]?.close ?? [];
+  const adjustedCloses = result.indicators?.adjclose?.[0]?.adjclose ?? [];
   const volumes = result.indicators?.quote?.[0]?.volume ?? [];
   const points: YahooChartPoint[] = [];
   for (let i = 0; i < timestamps.length; i++) {
-    const close = closes[i];
+    const rawClose = closes[i];
+    const adjustedClose = adjustedCloses[i];
+    const close =
+      typeof adjustedClose === "number" && Number.isFinite(adjustedClose)
+        ? adjustedClose
+        : rawClose;
     if (close == null) continue;
     points.push({
       date: new Date(timestamps[i] * 1000).toISOString().slice(0, 10),
@@ -243,7 +268,7 @@ async function fetchYahooQuoteSummary(
     return data.quoteSummary?.result?.[0] ?? null;
   } catch (err) {
     logger.error({ err, ticker }, "Yahoo Finance quoteSummary failed");
-    return null;
+    throw err;
   }
 }
 

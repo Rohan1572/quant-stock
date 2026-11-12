@@ -41,6 +41,29 @@ dropped. `coverageShrink()` pulls it back toward neutral.
 Without the gate, a stock with none of its financial data still scored ~52%
 confidence purely for having a clean price series.
 
+**6. The score range is indicative, not a statistical confidence interval.**
+Its width is a heuristic propagation of metric noise, missing coverage, and a
+model-error floor. It has not been calibrated to achieve any probability
+coverage in historical data.
+
+**7. Metric weight balance is not metric independence.** The legacy
+`metricDiversity` confidence field measures how evenly available weights are
+distributed; it does not estimate correlation. Obvious duplicated exposures
+are reduced with lower weights, but empirical correlation adjustment requires
+point-in-time peer and return data.
+
+## Category-specific notes
+
+- Debt/equity contributes to risk only, and negative values are excluded because
+  they can indicate negative book equity rather than low leverage.
+- Financial health uses FCF conversion (`FCF / positive net income`) and FCF
+  yield, not a company-specific net-margin hurdle.
+- In Financial Services, EV/EBITDA, operating-company liquidity/FCF measures,
+  and debt/equity are excluded. Sector-specific capital and asset-quality data
+  are not currently available, so coverage is intentionally lower.
+- Obvious duplicate signals have lower relative weights. Those weights remain
+  heuristic until evaluated on point-in-time data.
+
 ## Caveats in the data feed
 
 **Yahoo betas are unreliable for Indian NSE names.** Measured live:
@@ -52,16 +75,31 @@ confidence purely for having a clean price series.
 | TCS      | 0.166         |
 | HDFCBANK | 0.404         |
 
-None of these are low-risk businesses. Taken at face value they put the WACC
-near the risk-free rate, which overstated fair value by ~47% — TCS moved from
-₹3150 to ₹2147 once corrected. `computeWacc()` applies the **Blume
-adjustment**, `β = ⅓·raw + ⅔·1.0`, and floors the result at the risk-free rate.
-A beta outside `(0, 3)` is excluded from the risk category and falls back to
-`1.0` for the discount rate, rather than being scored as an extreme.
+These observations motivate a **Blume adjustment**, `β = ⅓·raw + ⅔·1.0`.
+Betas outside `(0, 3)` are excluded from risk scoring and fall back to `1.0`
+for the illustrative DCF.
+
+**The DCF is an illustrative equity-cash-flow proxy, not a bank-grade
+valuation.** Yahoo free cash flow (operating cash flow less capex) is treated
+as an equity cash-flow proxy, discounted at cost of equity, without adding cash
+or subtracting debt a second time. Revenue growth is only a proxy for FCF
+growth; rates are approximate fixed assumptions. Financial statements and FCF
+growth history are needed to improve it.
 
 **Sector benchmarks are indicative, not live peer medians.** They are a static
 table, so `benchmarkQuality` deliberately scores below 1.0 and live sector
-percentile ranking remains future work.
+percentile ranking remains future work. For Financial Services, EV/EBITDA,
+standard liquidity ratios, FCF measures, and debt/equity are excluded where
+they are not comparable, and the FCF-based DCF estimate is omitted. The model
+does not yet have bank-specific capital or asset-quality measures.
+
+**Price history uses adjusted close when Yahoo supplies it.** If the upstream
+feed omits adjusted close, the series falls back to raw close and may still
+contain corporate-action discontinuities.
+
+**Ratings are screening buckets, not trade recommendations.** They are not
+calibrated to expected returns, a holding period, transaction costs, or a
+portfolio mandate.
 
 **`core.autocrlf` and Prettier.** See `.prettierrc.json`; the default `lf`
 setting fights the Windows checkout and fails `format:check` on every clone.

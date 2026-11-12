@@ -15,16 +15,16 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 async function main() {
   const outDir = await mkdtemp(join(here, ".quantstock-test-"));
-  const testFiles = ["scoring.test", "data-fetching.test"].map((name) =>
-    join(outDir, `${name}.mjs`),
-  );
+  const testNames = [
+    "scoring.test",
+    "data-fetching.test",
+    "score-cache-policy.test",
+  ];
+  const testFiles = testNames.map((name) => join(outDir, `${name}.mjs`));
 
   try {
     await build({
-      entryPoints: [
-        join(here, "scoring.test.ts"),
-        join(here, "data-fetching.test.ts"),
-      ],
+      entryPoints: testNames.map((name) => join(here, `${name}.ts`)),
       bundle: true,
       format: "esm",
       platform: "node",

@@ -117,13 +117,13 @@ Check that every workspace declares what it imports:
 npm run audit:deps
 ```
 
-Check for new dependency vulnerabilities:
+Check for dependency vulnerabilities:
 
 ```powershell
 npm audit
 ```
 
-This fails when npm reports dependency vulnerabilities.
+This reports all dependency vulnerabilities and fails only for high or critical findings.
 
 It replaced `fast-glob` in the mockup sandbox, which was the only route to a
 high-severity `braces` stack-exhaustion advisory (CVE-2026-93687) with no

@@ -9,7 +9,7 @@ import {
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useGetStockHistory } from "@workspace/api-client-react";
+import { useGetStockPriceHistory } from "@workspace/api-client-react";
 
 interface ChartProps {
   readonly ticker: string;
@@ -17,7 +17,7 @@ interface ChartProps {
 }
 
 export function PriceChart({ ticker, range }: ChartProps) {
-  const { data, isLoading, isError } = useGetStockHistory(ticker, range);
+  const { data, isLoading, isError } = useGetStockPriceHistory(ticker, range);
 
   if (isLoading) {
     return (

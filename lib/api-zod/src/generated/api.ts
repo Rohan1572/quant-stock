@@ -12,7 +12,7 @@ import * as zod from 'zod';
  * Returns server health status
  * @summary Health check
  */
-export const HealthCheckResponse = zod.object({
+export const GetHealthStatusResponse = zod.object({
   "status": zod.string()
 })
 
@@ -20,7 +20,7 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Get pre-computed top-stock rankings
  */
-export const GetRankingsResponse = zod.object({
+export const ListRankingsResponse = zod.object({
   "items": zod.array(zod.object({
   "rank": zod.number().int(),
   "ticker": zod.string(),
@@ -76,11 +76,11 @@ export const SearchStocksResponse = zod.array(SearchStocksResponseItem)
 /**
  * @summary Get stock profile
  */
-export const GetStockParams = zod.object({
+export const GetStockProfileParams = zod.object({
   "ticker": zod.coerce.string().describe('NSE/BSE ticker, e.g. RELIANCE.NS or 500325.BO')
 })
 
-export const GetStockResponse = zod.object({
+export const GetStockProfileResponse = zod.object({
   "ticker": zod.string(),
   "companyName": zod.string(),
   "sector": zod.string().nullable(),
@@ -96,11 +96,11 @@ export const GetStockResponse = zod.object({
 /**
  * @summary Get the cached/current score summary for a ticker
  */
-export const GetStockScoreParams = zod.object({
+export const GetStockScoreSummaryParams = zod.object({
   "ticker": zod.coerce.string().describe('NSE/BSE ticker, e.g. RELIANCE.NS or 500325.BO')
 })
 
-export const GetStockScoreResponse = zod.object({
+export const GetStockScoreSummaryResponse = zod.object({
   "ticker": zod.string(),
   "overallScore": zod.number(),
   "recommendation": zod.enum(['very_positive', 'positive', 'neutral', 'negative', 'very_negative', 'extremely_negative']).describe('Screening rating based on the model score; not a trade recommendation'),
@@ -223,12 +223,12 @@ export const GetStockScoreDetailsResponse = zod.object({
 /**
  * @summary Get price history for charting
  */
-export const GetStockHistoryParams = zod.object({
+export const GetStockPriceHistoryParams = zod.object({
   "ticker": zod.coerce.string().describe('NSE/BSE ticker, e.g. RELIANCE.NS or 500325.BO'),
   "range": zod.enum(['1m', '6m', '1y', '5y'])
 })
 
-export const GetStockHistoryResponse = zod.object({
+export const GetStockPriceHistoryResponse = zod.object({
   "ticker": zod.string(),
   "range": zod.string(),
   "points": zod.array(zod.object({
@@ -259,37 +259,37 @@ export const ListScoringConfigsResponse = zod.array(ListScoringConfigsResponseIt
 /**
  * @summary Create or update the category weights for the platform default or a specific sector
  */
-export const upsertScoringConfigBodyValuationWeightMin = 0;
-export const upsertScoringConfigBodyValuationWeightMax = 1;
+export const saveScoringConfigBodyValuationWeightMin = 0;
+export const saveScoringConfigBodyValuationWeightMax = 1;
 
-export const upsertScoringConfigBodyFinancialHealthWeightMin = 0;
-export const upsertScoringConfigBodyFinancialHealthWeightMax = 1;
+export const saveScoringConfigBodyFinancialHealthWeightMin = 0;
+export const saveScoringConfigBodyFinancialHealthWeightMax = 1;
 
-export const upsertScoringConfigBodyProfitabilityWeightMin = 0;
-export const upsertScoringConfigBodyProfitabilityWeightMax = 1;
+export const saveScoringConfigBodyProfitabilityWeightMin = 0;
+export const saveScoringConfigBodyProfitabilityWeightMax = 1;
 
-export const upsertScoringConfigBodyGrowthWeightMin = 0;
-export const upsertScoringConfigBodyGrowthWeightMax = 1;
+export const saveScoringConfigBodyGrowthWeightMin = 0;
+export const saveScoringConfigBodyGrowthWeightMax = 1;
 
-export const upsertScoringConfigBodyRiskWeightMin = 0;
-export const upsertScoringConfigBodyRiskWeightMax = 1;
+export const saveScoringConfigBodyRiskWeightMin = 0;
+export const saveScoringConfigBodyRiskWeightMax = 1;
 
-export const upsertScoringConfigBodyMomentumWeightMin = 0;
-export const upsertScoringConfigBodyMomentumWeightMax = 1;
+export const saveScoringConfigBodyMomentumWeightMin = 0;
+export const saveScoringConfigBodyMomentumWeightMax = 1;
 
 
 
-export const UpsertScoringConfigBody = zod.object({
+export const SaveScoringConfigBody = zod.object({
   "sector": zod.string().nullable().describe('Sector name this override applies to, or null for the platform default'),
-  "valuationWeight": zod.number().min(upsertScoringConfigBodyValuationWeightMin).max(upsertScoringConfigBodyValuationWeightMax),
-  "financialHealthWeight": zod.number().min(upsertScoringConfigBodyFinancialHealthWeightMin).max(upsertScoringConfigBodyFinancialHealthWeightMax),
-  "profitabilityWeight": zod.number().min(upsertScoringConfigBodyProfitabilityWeightMin).max(upsertScoringConfigBodyProfitabilityWeightMax),
-  "growthWeight": zod.number().min(upsertScoringConfigBodyGrowthWeightMin).max(upsertScoringConfigBodyGrowthWeightMax),
-  "riskWeight": zod.number().min(upsertScoringConfigBodyRiskWeightMin).max(upsertScoringConfigBodyRiskWeightMax),
-  "momentumWeight": zod.number().min(upsertScoringConfigBodyMomentumWeightMin).max(upsertScoringConfigBodyMomentumWeightMax)
+  "valuationWeight": zod.number().min(saveScoringConfigBodyValuationWeightMin).max(saveScoringConfigBodyValuationWeightMax),
+  "financialHealthWeight": zod.number().min(saveScoringConfigBodyFinancialHealthWeightMin).max(saveScoringConfigBodyFinancialHealthWeightMax),
+  "profitabilityWeight": zod.number().min(saveScoringConfigBodyProfitabilityWeightMin).max(saveScoringConfigBodyProfitabilityWeightMax),
+  "growthWeight": zod.number().min(saveScoringConfigBodyGrowthWeightMin).max(saveScoringConfigBodyGrowthWeightMax),
+  "riskWeight": zod.number().min(saveScoringConfigBodyRiskWeightMin).max(saveScoringConfigBodyRiskWeightMax),
+  "momentumWeight": zod.number().min(saveScoringConfigBodyMomentumWeightMin).max(saveScoringConfigBodyMomentumWeightMax)
 })
 
-export const UpsertScoringConfigResponse = zod.object({
+export const SaveScoringConfigResponse = zod.object({
   "id": zod.number().int(),
   "sector": zod.string().nullable(),
   "valuationWeight": zod.number(),

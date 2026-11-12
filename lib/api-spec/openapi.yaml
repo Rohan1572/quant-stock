@@ -12,14 +12,14 @@ tags:
     description: Health operations
   - name: stocks
     description: Stock lookup, scoring, and history
-  - name: scoring-config
+  - name: scoring-configs
     description: Scoring weight configuration
   - name: rankings
     description: Pre-computed top-stock rankings
 paths:
-  /healthz:
+  /health:
     get:
-      operationId: healthCheck
+      operationId: getHealthStatus
       tags: [health]
       summary: Health check
       description: Returns server health status
@@ -33,7 +33,7 @@ paths:
 
   /rankings:
     get:
-      operationId: getRankings
+      operationId: listRankings
       tags: [rankings]
       summary: Get pre-computed top-stock rankings
       responses:
@@ -81,7 +81,7 @@ paths:
 
   /stocks/{ticker}:
     get:
-      operationId: getStock
+      operationId: getStockProfile
       tags: [stocks]
       summary: Get stock profile
       parameters:
@@ -102,7 +102,7 @@ paths:
 
   /stocks/{ticker}/score:
     get:
-      operationId: getStockScore
+      operationId: getStockScoreSummary
       tags: [stocks]
       summary: Get the cached/current score summary for a ticker
       parameters:
@@ -144,7 +144,7 @@ paths:
 
   /stocks/{ticker}/history/{range}:
     get:
-      operationId: getStockHistory
+      operationId: getStockPriceHistory
       tags: [stocks]
       summary: Get price history for charting
       parameters:
@@ -169,10 +169,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /scoring-config:
+  /scoring-configs:
     get:
       operationId: listScoringConfigs
-      tags: [scoring-config]
+      tags: [scoring-configs]
       summary: List all scoring configs (platform default + per-sector overrides)
       responses:
         "200":
@@ -184,8 +184,8 @@ paths:
                 items:
                   $ref: "#/components/schemas/ScoringConfig"
     post:
-      operationId: upsertScoringConfig
-      tags: [scoring-config]
+      operationId: saveScoringConfig
+      tags: [scoring-configs]
       summary: Create or update the category weights for the platform default or a specific sector
       requestBody:
         required: true

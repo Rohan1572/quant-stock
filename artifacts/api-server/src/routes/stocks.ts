@@ -2,14 +2,14 @@ import { Router, type IRouter } from "express";
 import {
   SearchStocksQueryParams,
   SearchStocksResponse,
-  GetStockParams,
-  GetStockResponse,
-  GetStockScoreParams,
-  GetStockScoreResponse,
+  GetStockProfileParams,
+  GetStockProfileResponse,
+  GetStockScoreSummaryParams,
+  GetStockScoreSummaryResponse,
   GetStockScoreDetailsParams,
   GetStockScoreDetailsResponse,
-  GetStockHistoryParams,
-  GetStockHistoryResponse,
+  GetStockPriceHistoryParams,
+  GetStockPriceHistoryResponse,
 } from "@workspace/api-zod";
 import {
   getScore,
@@ -33,7 +33,7 @@ router.get("/stocks/search", async (req, res): Promise<void> => {
 });
 
 router.get("/stocks/:ticker", async (req, res): Promise<void> => {
-  const params = GetStockParams.safeParse(req.params);
+  const params = GetStockProfileParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
@@ -46,7 +46,7 @@ router.get("/stocks/:ticker", async (req, res): Promise<void> => {
   }
 
   res.json(
-    GetStockResponse.parse({
+    GetStockProfileResponse.parse({
       ...profile,
       lastUpdated: new Date().toISOString(),
     }),
@@ -54,7 +54,7 @@ router.get("/stocks/:ticker", async (req, res): Promise<void> => {
 });
 
 router.get("/stocks/:ticker/score", async (req, res): Promise<void> => {
-  const params = GetStockScoreParams.safeParse(req.params);
+  const params = GetStockScoreSummaryParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
@@ -63,7 +63,7 @@ router.get("/stocks/:ticker/score", async (req, res): Promise<void> => {
   try {
     const score = await getScore(params.data.ticker);
     res.json(
-      GetStockScoreResponse.parse({
+      GetStockScoreSummaryResponse.parse({
         ticker: score.ticker,
         overallScore: score.overallScore,
         recommendation: score.recommendation,
@@ -132,7 +132,7 @@ router.get("/stocks/:ticker/score/details", async (req, res): Promise<void> => {
 router.get(
   "/stocks/:ticker/history/:range",
   async (req, res): Promise<void> => {
-    const params = GetStockHistoryParams.safeParse(req.params);
+    const params = GetStockPriceHistoryParams.safeParse(req.params);
     if (!params.success) {
       res.status(400).json({ error: params.error.message });
       return;
@@ -147,7 +147,7 @@ router.get(
     }
 
     res.json(
-      GetStockHistoryResponse.parse({
+      GetStockPriceHistoryResponse.parse({
         ticker: params.data.ticker.toUpperCase(),
         range: params.data.range,
         points,

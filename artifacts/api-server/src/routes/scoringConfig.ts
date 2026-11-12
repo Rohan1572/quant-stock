@@ -4,19 +4,19 @@ import { db, scoringConfigsTable } from "@workspace/db";
 import { isValidCategoryWeights } from "../lib/quant/scoring";
 import {
   ListScoringConfigsResponse,
-  UpsertScoringConfigBody,
-  UpsertScoringConfigResponse,
+  SaveScoringConfigBody,
+  SaveScoringConfigResponse,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
-router.get("/scoring-config", async (_req, res): Promise<void> => {
+router.get("/scoring-configs", async (_req, res): Promise<void> => {
   const configs = await db.select().from(scoringConfigsTable);
   res.json(ListScoringConfigsResponse.parse(configs));
 });
 
-router.post("/scoring-config", async (req, res): Promise<void> => {
-  const parsed = UpsertScoringConfigBody.safeParse(req.body);
+router.post("/scoring-configs", async (req, res): Promise<void> => {
+  const parsed = SaveScoringConfigBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
@@ -56,7 +56,7 @@ router.post("/scoring-config", async (req, res): Promise<void> => {
         .returning()
     : await db.insert(scoringConfigsTable).values(weights).returning();
 
-  res.json(UpsertScoringConfigResponse.parse(saved));
+  res.json(SaveScoringConfigResponse.parse(saved));
 });
 
 export default router;

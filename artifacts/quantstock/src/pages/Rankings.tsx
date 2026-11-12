@@ -13,9 +13,9 @@ import {
   X,
 } from "lucide-react";
 import {
-  useGetRankings,
+  useListRankings,
   useRefreshRankings,
-  getGetRankingsQueryKey,
+  getListRankingsQueryKey,
 } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -131,9 +131,9 @@ export default function Rankings() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSector, setActiveSector] = useState<string | null>(null);
 
-  const { data, isLoading, refetch } = useGetRankings({
+  const { data, isLoading, refetch } = useListRankings({
     query: {
-      queryKey: getGetRankingsQueryKey(),
+      queryKey: getListRankingsQueryKey(),
       staleTime: 0,
       refetchInterval: (q) => (q.state.data?.isRefreshing ? 5_000 : false),
     },

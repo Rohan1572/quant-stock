@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   useListScoringConfigs,
-  useUpsertScoringConfig,
+  useSaveScoringConfig,
   getListScoringConfigsQueryKey,
   ScoringConfig as IScoringConfig,
 } from "@workspace/api-client-react";
@@ -76,7 +76,7 @@ export default function ScoringConfig() {
   const { toast } = useToast();
 
   const { data: configs, isLoading } = useListScoringConfigs();
-  const upsertConfig = useUpsertScoringConfig();
+  const saveConfig = useSaveScoringConfig();
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingSector, setEditingSector] = useState<string | null | undefined>(
@@ -140,7 +140,7 @@ export default function ScoringConfig() {
   };
 
   const onSubmit = (data: ConfigFormValues) => {
-    upsertConfig.mutate(
+    saveConfig.mutate(
       {
         data: {
           sector: data.sector || null,
@@ -153,12 +153,12 @@ export default function ScoringConfig() {
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           toast({
             title: "Configuration Saved",
             description: `Successfully updated weights for ${data.sector || "Platform Default"}.`,
           });
-          queryClient.invalidateQueries({
+          await queryClient.invalidateQueries({
             queryKey: getListScoringConfigsQueryKey(),
           });
           setIsEditing(false);
@@ -226,8 +226,11 @@ export default function ScoringConfig() {
               >
                 {editingSector !== null && (
                   <div className="max-w-sm space-y-2">
-                    <label className="text-sm font-medium">Sector Name</label>
+                    <label htmlFor="sector-name" className="text-sm font-medium">
+                      Sector Name
+                    </label>
                     <Input
+                      id="sector-name"
                       placeholder="e.g. Technology"
                       {...form.register("sector")}
                       disabled={editingSector !== undefined} // cant change sector once created, only platform default is null
@@ -246,8 +249,11 @@ export default function ScoringConfig() {
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6 p-4 bg-muted/20 rounded-xl border border-dashed">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Valuation</label>
+                    <label htmlFor="valuation-weight" className="text-sm font-medium">
+                      Valuation
+                    </label>
                     <Input
+                      id="valuation-weight"
                       type="number"
                       step="0.01"
                       min="0"
@@ -256,10 +262,11 @@ export default function ScoringConfig() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">
+                    <label htmlFor="financial-health-weight" className="text-sm font-medium">
                       Financial Health
                     </label>
                     <Input
+                      id="financial-health-weight"
                       type="number"
                       step="0.01"
                       min="0"
@@ -268,8 +275,11 @@ export default function ScoringConfig() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Profitability</label>
+                    <label htmlFor="profitability-weight" className="text-sm font-medium">
+                      Profitability
+                    </label>
                     <Input
+                      id="profitability-weight"
                       type="number"
                       step="0.01"
                       min="0"
@@ -278,8 +288,11 @@ export default function ScoringConfig() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Growth</label>
+                    <label htmlFor="growth-weight" className="text-sm font-medium">
+                      Growth
+                    </label>
                     <Input
+                      id="growth-weight"
                       type="number"
                       step="0.01"
                       min="0"
@@ -288,8 +301,11 @@ export default function ScoringConfig() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Risk</label>
+                    <label htmlFor="risk-weight" className="text-sm font-medium">
+                      Risk
+                    </label>
                     <Input
+                      id="risk-weight"
                       type="number"
                       step="0.01"
                       min="0"
@@ -298,8 +314,11 @@ export default function ScoringConfig() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Momentum</label>
+                    <label htmlFor="momentum-weight" className="text-sm font-medium">
+                      Momentum
+                    </label>
                     <Input
+                      id="momentum-weight"
                       type="number"
                       step="0.01"
                       min="0"
@@ -330,17 +349,17 @@ export default function ScoringConfig() {
                       type="button"
                       variant="outline"
                       onClick={cancelEdit}
-                      disabled={upsertConfig.isPending}
+                      disabled={saveConfig.isPending}
                     >
                       <X className="w-4 h-4 mr-2" /> Cancel
                     </Button>
                     <Button
                       type="submit"
-                      disabled={upsertConfig.isPending}
+                      disabled={saveConfig.isPending}
                       data-testid="button-save-config"
                     >
                       <Save className="w-4 h-4 mr-2" />
-                      {upsertConfig.isPending
+                      {saveConfig.isPending
                         ? "Saving..."
                         : "Save Configuration"}
                     </Button>

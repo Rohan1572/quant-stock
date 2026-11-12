@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { inArray } from "drizzle-orm";
 import { db, scoreResultsTable } from "@workspace/db";
 import {
-  GetRankingsResponse,
+  ListRankingsResponse,
   RefreshRankingsResponse,
 } from "@workspace/api-zod";
 import { WATCHLIST, getWatchlistEntry } from "../lib/quant/nifty100";
@@ -145,7 +145,7 @@ router.get("/rankings", async (_req, res): Promise<void> => {
     });
 
   res.json(
-    GetRankingsResponse.parse({
+    ListRankingsResponse.parse({
       items: sorted,
       total: WATCHLIST.length,
       scored: rows.length,

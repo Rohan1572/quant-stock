@@ -13,10 +13,10 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import {
-  useGetStock,
-  useGetStockScore,
+  useGetStockProfile,
+  useGetStockScoreSummary,
   useGetStockScoreDetails,
-  getStockScore,
+  getStockScoreSummary,
 } from "@workspace/api-client-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -169,7 +169,7 @@ function QuantScoreDial({
   score,
   isLoading,
 }: Readonly<{
-  score: Awaited<ReturnType<typeof getStockScore>> | undefined;
+  score: Awaited<ReturnType<typeof getStockScoreSummary>> | undefined;
   isLoading: boolean;
 }>) {
   if (isLoading) {
@@ -185,7 +185,11 @@ function QuantScoreDial({
   return (
     <>
       <div className="relative inline-flex items-center justify-center mb-4">
-        <svg className="w-36 h-36 transform -rotate-90">
+        <svg
+          className="w-36 h-36 transform -rotate-90"
+          aria-hidden="true"
+          focusable="false"
+        >
           <circle
             cx="72"
             cy="72"
@@ -283,12 +287,12 @@ export default function StockScore() {
     data: stock,
     isLoading: isStockLoading,
     isError: isStockError,
-  } = useGetStock(decodedTicker);
+  } = useGetStockProfile(decodedTicker);
   const {
     data: score,
     isLoading: isScoreLoading,
     isError: isScoreError,
-  } = useGetStockScore(decodedTicker);
+  } = useGetStockScoreSummary(decodedTicker);
   const { data: details, isLoading: isDetailsLoading } =
     useGetStockScoreDetails(decodedTicker, {
       query: { enabled: showDetails },
@@ -558,8 +562,8 @@ export default function StockScore() {
                       <CheckCircle2 className="w-4 h-4 mr-1.5" /> Key Drivers
                     </h4>
                     <ul className="space-y-2">
-                      {score?.explanation.reasons.map((reason, i) => (
-                        <li key={i} className="text-sm flex items-start">
+                      {score?.explanation.reasons.map((reason) => (
+                        <li key={`reason-${reason}`} className="text-sm flex items-start">
                           <span className="w-1.5 h-1.5 rounded-full bg-buy mt-1.5 mr-2 shrink-0" />
                           <span className="text-foreground/90 leading-tight">
                             {reason}
@@ -578,17 +582,17 @@ export default function StockScore() {
                       <AlertTriangle className="w-4 h-4 mr-1.5" /> Risk Factors
                     </h4>
                     <ul className="space-y-2">
-                      {score?.explanation.risks.map((risk, i) => (
-                        <li key={i} className="text-sm flex items-start">
+                      {score?.explanation.risks.map((risk) => (
+                        <li key={`risk-${risk}`} className="text-sm flex items-start">
                           <span className="w-1.5 h-1.5 rounded-full bg-sell mt-1.5 mr-2 shrink-0" />
                           <span className="text-foreground/90 leading-tight">
                             {risk}
                           </span>
                         </li>
                       ))}
-                      {score?.riskFlags.map((flag, i) => (
+                      {score?.riskFlags.map((flag) => (
                         <li
-                          key={`flag-${i}`}
+                          key={`flag-${flag}`}
                           className="text-sm flex items-start"
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-destructive mt-1.5 mr-2 shrink-0" />

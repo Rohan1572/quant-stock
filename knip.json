@@ -1,0 +1,16 @@
+{
+  "workspaces": {
+    "artifacts/mockup-sandbox": {
+      "entry": ["src/**/*.{ts,tsx}"]
+    },
+    "artifacts/quantstock": {
+      "entry": ["src/**/*.{ts,tsx}"]
+    },
+    "artifacts/api-server": {
+      "entry": ["test/**/*.test.ts"]
+    },
+    "lib/db": {
+      "entry": ["migrations/*.ts"]
+    }
+  }
+}

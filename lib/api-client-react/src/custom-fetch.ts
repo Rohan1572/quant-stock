@@ -205,7 +205,7 @@ function buildErrorMessage(response: Response, data: unknown): string {
   return prefix;
 }
 
-export class ApiError<T = unknown> extends Error {
+class ApiError<T = unknown> extends Error {
   readonly name = "ApiError";
   readonly status: number;
   readonly statusText: string;
@@ -233,7 +233,7 @@ export class ApiError<T = unknown> extends Error {
   }
 }
 
-export class ResponseParseError extends Error {
+class ResponseParseError extends Error {
   readonly name = "ResponseParseError";
   readonly status: number;
   readonly statusText: string;

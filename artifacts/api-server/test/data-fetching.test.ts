@@ -7,6 +7,7 @@ import {
 } from "../src/lib/quant/scoringInputs";
 import { singleFlight } from "../src/lib/quant/singleFlight";
 import { TransientProviderError } from "../src/lib/quant/providerErrors";
+import { logger } from "../src/lib/logger";
 import type { DataProvider, StockProfile } from "../src/lib/quant/provider";
 import { yahooChart, yahooQuoteSummary } from "../src/lib/quant/yahooClient";
 
@@ -160,8 +161,10 @@ describe("Yahoo quote-summary request coalescing", () => {
 
   it("clears failed in-flight requests so later calls can retry", async () => {
     const originalFetch = globalThis.fetch;
+    const originalLogLevel = logger.level;
     let quoteSummaryRequests = 0;
     let shouldFail = true;
+    logger.level = "silent";
     globalThis.fetch = async (input) => {
       const url = String(input);
       if (url.includes("/v10/finance/quoteSummary/")) {
@@ -189,6 +192,7 @@ describe("Yahoo quote-summary request coalescing", () => {
       assert.equal(quoteSummaryRequests, 2);
     } finally {
       globalThis.fetch = originalFetch;
+      logger.level = originalLogLevel;
     }
   });
 });

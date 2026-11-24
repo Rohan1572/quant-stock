@@ -6,7 +6,7 @@
  * a concrete, contextual instruction.
  */
 
-export type PositionAction =
+type PositionAction =
   | "strong_buy_more"
   | "buy_more"
   | "average_down"

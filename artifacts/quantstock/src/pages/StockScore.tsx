@@ -32,12 +32,26 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PositionCard } from "@/components/PositionCard";
+import { useMarket } from "@/contexts/MarketContext";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const PriceChart = lazy(() =>
   import("@/components/chart/PriceChart").then((module) => ({
     default: module.PriceChart,
   })),
 );
+
+function getDefaultCurrency(market: "india" | "us"): string {
+  return market === "india" ? "INR" : "USD";
+}
+
+function formatStockPrice(
+  price: number | null | undefined,
+  currency: string,
+): string {
+  if (price == null) return "N/A";
+  return formatCurrency(price, currency);
+}
 
 function formatRecommendation(rec: string) {
   return rec
@@ -277,6 +291,7 @@ function QuantScoreDial({
 export default function StockScore() {
   const { ticker } = useParams<{ ticker: string }>();
   const decodedTicker = decodeURIComponent(ticker).toUpperCase();
+  const { market } = useMarket();
 
   type ChartRange = "1m" | "6m" | "1y" | "5y";
 
@@ -287,15 +302,25 @@ export default function StockScore() {
     data: stock,
     isLoading: isStockLoading,
     isError: isStockError,
-  } = useGetStockProfile(decodedTicker);
+  } = useGetStockProfile(decodedTicker, {
+    query: { queryKey: ["/api/stocks", decodedTicker, market] },
+    request: { headers: { "X-Market": market } },
+  });
   const {
     data: score,
     isLoading: isScoreLoading,
     isError: isScoreError,
-  } = useGetStockScoreSummary(decodedTicker);
+  } = useGetStockScoreSummary(decodedTicker, {
+    query: { queryKey: ["/api/stocks", decodedTicker, "score", market] },
+    request: { headers: { "X-Market": market } },
+  });
   const { data: details, isLoading: isDetailsLoading } =
     useGetStockScoreDetails(decodedTicker, {
-      query: { enabled: showDetails },
+      query: {
+        enabled: showDetails,
+        queryKey: ["/api/stocks", decodedTicker, "score", "details", market],
+      },
+      request: { headers: { "X-Market": market } },
     });
 
   if (isStockError || isScoreError) {
@@ -387,7 +412,7 @@ export default function StockScore() {
                     {stock?.ticker}
                   </h1>
                   <Badge variant="outline" className="text-sm">
-                    {stock?.currency || "INR"}
+                    {stock?.currency || getDefaultCurrency(market)}
                   </Badge>
                 </div>
                 <h2 className="text-lg md:text-xl text-muted-foreground font-medium">
@@ -415,11 +440,10 @@ export default function StockScore() {
             ) : (
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-bold font-mono">
-                  ₹
-                  {stock?.price?.toLocaleString("en-IN", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  }) ?? "N/A"}
+                  {formatStockPrice(
+                    stock?.price,
+                    stock?.currency || getDefaultCurrency(market),
+                  )}
                 </span>
                 {stock?.changePercent != null && (
                   <span
@@ -494,7 +518,11 @@ export default function StockScore() {
                   </div>
                 }
               >
-                <PriceChart ticker={decodedTicker} range={chartRange} />
+                <PriceChart
+                  ticker={decodedTicker}
+                  range={chartRange}
+                  currency={stock?.currency || getDefaultCurrency(market)}
+                />
               </Suspense>
             </CardContent>
           </Card>
@@ -520,11 +548,10 @@ export default function StockScore() {
                         DCF Fair Value Estimate
                       </div>
                       <div className="text-2xl font-bold font-mono">
-                        {score.fairValueEstimate.toLocaleString("en-IN", {
-                          maximumFractionDigits: 2,
-                          style: "currency",
-                          currency: stock.currency || "INR",
-                        })}
+                        {formatCurrency(
+                          score.fairValueEstimate,
+                          stock.currency || getDefaultCurrency(market),
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
@@ -627,7 +654,8 @@ export default function StockScore() {
             <PositionCard
               ticker={decodedTicker}
               currentPrice={stock.price}
-              currency={stock.currency ?? "INR"}
+              currency={stock.currency || getDefaultCurrency(market)}
+              market={market}
               // The confidence-adjusted score, matching what drives the
               // recommendation. Using the raw score here let this card advise
               // "add to position" while the badge above said "hold".
@@ -743,6 +771,10 @@ export default function StockScore() {
                             </div>
                           )}
                         </div>
+                        <p className="text-xs text-center text-muted-foreground mb-8">
+                          Market data from Yahoo Finance is unofficial and may
+                          be delayed or incomplete.
+                        </p>
                       </div>
                     </CardContent>
                   </Card>

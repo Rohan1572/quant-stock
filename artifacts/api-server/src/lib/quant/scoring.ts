@@ -1,4 +1,5 @@
 import type { FinancialSnapshot, PricePoint, StockProfile } from "./provider";
+import type { Market } from "./market";
 import {
   getSectorBenchmark,
   hasSectorBenchmark,
@@ -265,7 +266,7 @@ function aggregateCategory(
     score: clampScore(50 + (raw - 50) * shrink),
     metrics,
     coverage: cov,
-    volatility: Math.sqrt((metricSigma * shrink) ** 2 + missingDataSigma ** 2),
+    volatility: Math.hypot(metricSigma * shrink, missingDataSigma),
   };
 }
 
@@ -519,9 +520,11 @@ export function scoreMomentum(
   // 6-month price return, percent.
   let return6m: number | null = null;
   if (closes.length >= 120) {
-    const past = closes[closes.length - 121];
-    const now = closes[closes.length - 1];
-    if (past > 0) return6m = ((now - past) / past) * 100;
+    const past = closes.at(-121);
+    const now = closes.at(-1);
+    if (past != null && now != null && past > 0) {
+      return6m = ((now - past) / past) * 100;
+    }
   }
 
   const metrics = [
@@ -556,6 +559,7 @@ export function computeCategories(
   fin: FinancialSnapshot,
   weights: CategoryWeights,
   priceHistory: PricePoint[] = [],
+  market: Market = "india",
 ): CategoryComputation {
   if (!isValidCategoryWeights(weights)) {
     throw new RangeError(
@@ -563,7 +567,7 @@ export function computeCategories(
     );
   }
 
-  const bench = getSectorBenchmark(profile.sector);
+  const bench = getSectorBenchmark(profile.sector, market);
 
   const valuation = scoreValuation(fin, bench, profile.sector);
   const financialHealth = scoreFinancialHealth(fin, profile);
@@ -730,7 +734,7 @@ function computeHistoryQuality(priceHistory: PricePoint[]): number {
   // ~120 trading days needed for the 6-month return; 20 for volatility.
   const lengthScore = Math.min(priceHistory.length / 120, 1);
 
-  const last = priceHistory[priceHistory.length - 1]?.date;
+  const last = priceHistory.at(-1)?.date;
   let recencyScore = 0.5;
   if (last) {
     const ageDays = (Date.now() - new Date(last).getTime()) / 86_400_000;
@@ -759,6 +763,7 @@ export function computeConfidence(
   priceHistory: PricePoint[],
   categories: CategoryDetail[] = [],
   sector: string | null = null,
+  market: Market = "india",
 ): ConfidenceResult {
   let dataCoverage: number;
   if (categories.length > 0) {
@@ -808,7 +813,13 @@ export function computeConfidence(
   // reference than true peer medians.
   // A matched sector benchmark is an indicative static table, not live peer
   // medians, so it scores below perfect; broad-market defaults are weaker.
-  const benchmarkQuality = hasSectorBenchmark(sector) ? 0.85 : 0.4;
+  const hasBenchmark = hasSectorBenchmark(sector, market);
+  let benchmarkQuality = 0.4;
+  if (market === "us") {
+    benchmarkQuality = hasBenchmark ? 0.55 : 0.3;
+  } else if (hasBenchmark) {
+    benchmarkQuality = 0.85;
+  }
   const historyQuality = computeHistoryQuality(priceHistory);
 
   const breakdown: ConfidenceBreakdown = {
@@ -837,10 +848,29 @@ export function computeConfidence(
   return { score: round(clampScore(score * 100), 1), breakdown };
 }
 
-const RISK_FREE_RATE = 0.065; // India 10Y government bond, approximate
-const EQUITY_RISK_PREMIUM = 0.055; // mature-market ERP
-const COUNTRY_RISK_PREMIUM = 0.015; // India country risk
-const TERMINAL_GROWTH_RATE = 0.045; // capped well below nominal GDP
+const MARKET_DCF_ASSUMPTIONS: Record<
+  Market,
+  {
+    riskFreeRate: number;
+    equityRiskPremium: number;
+    countryRiskPremium: number;
+    terminalGrowthRate: number;
+  }
+> = {
+  india: {
+    riskFreeRate: 0.065,
+    equityRiskPremium: 0.055,
+    countryRiskPremium: 0.015,
+    terminalGrowthRate: 0.045,
+  },
+  us: {
+    // Fixed initial baseline, not a live Treasury yield or market estimate.
+    riskFreeRate: 0.042,
+    equityRiskPremium: 0.05,
+    countryRiskPremium: 0,
+    terminalGrowthRate: 0.025,
+  },
+};
 const DEFAULT_BETA = 1.0;
 const FADE_YEARS = 10;
 // Blume adjustment: shrink raw beta two-thirds of the way toward 1.0. Published
@@ -851,10 +881,14 @@ const BLUME_BETA_WEIGHT = 1 / 3;
 // Yahoo free cash flow is operating cash flow less capex, so it is treated as
 // an equity-cash-flow proxy and discounted at cost of equity, without a second
 // debt/cash adjustment.
-function computeCostOfEquity(fin: FinancialSnapshot): {
+function computeCostOfEquity(
+  fin: FinancialSnapshot,
+  market: Market,
+): {
   discountRate: number;
   beta: number;
 } {
+  const assumptions = MARKET_DCF_ASSUMPTIONS[market];
   const rawBeta =
     fin.beta != null && fin.beta > 0 && fin.beta < 3 ? fin.beta : DEFAULT_BETA;
 
@@ -866,12 +900,14 @@ function computeCostOfEquity(fin: FinancialSnapshot): {
   const beta = BLUME_BETA_WEIGHT * rawBeta + (1 - BLUME_BETA_WEIGHT) * 1.0;
 
   const costOfEquity =
-    RISK_FREE_RATE + beta * EQUITY_RISK_PREMIUM + COUNTRY_RISK_PREMIUM;
+    assumptions.riskFreeRate +
+    beta * assumptions.equityRiskPremium +
+    assumptions.countryRiskPremium;
 
   // Keep a minimum spread over terminal growth to avoid an unstable Gordon
   // value. This remains an approximate, fixed-rate assumption.
   const discountRate = Math.min(
-    Math.max(costOfEquity, TERMINAL_GROWTH_RATE + 0.03),
+    Math.max(costOfEquity, assumptions.terminalGrowthRate + 0.03),
     0.25,
   );
   return { discountRate, beta };
@@ -880,18 +916,20 @@ function computeCostOfEquity(fin: FinancialSnapshot): {
 function buildDcfAssumptions(
   fin: FinancialSnapshot,
   growthRate: number | null,
+  market: Market,
 ): DcfAssumptions {
-  const { discountRate, beta } = computeCostOfEquity(fin);
+  const assumptions = MARKET_DCF_ASSUMPTIONS[market];
+  const { discountRate, beta } = computeCostOfEquity(fin, market);
   return {
     discountRate: round(discountRate, 4),
     discountRateType: "cost_of_equity",
-    terminalGrowthRate: TERMINAL_GROWTH_RATE,
+    terminalGrowthRate: assumptions.terminalGrowthRate,
     projectionYears: FADE_YEARS,
-    riskFreeRate: RISK_FREE_RATE,
-    equityRiskPremium: EQUITY_RISK_PREMIUM,
+    riskFreeRate: assumptions.riskFreeRate,
+    equityRiskPremium: assumptions.equityRiskPremium,
     beta: round(beta, 2),
     initialGrowthRate: growthRate == null ? null : round(growthRate, 4),
-    terminalYearGrowthRate: TERMINAL_GROWTH_RATE,
+    terminalYearGrowthRate: assumptions.terminalGrowthRate,
   };
 }
 
@@ -905,6 +943,7 @@ export function estimateFairValue(
   fin: FinancialSnapshot,
   growthRatePercent: number | null,
   sector: string | null = null,
+  market: Market = "india",
 ): number | null {
   if (
     isFinancialSector(sector) ||
@@ -919,8 +958,9 @@ export function estimateFairValue(
   }
 
   // Clamp the revenue-growth proxy; keep it below the discount rate.
-  const { discountRate } = computeCostOfEquity(fin);
-  const terminal = TERMINAL_GROWTH_RATE;
+  const assumptions = MARKET_DCF_ASSUMPTIONS[market];
+  const { discountRate } = computeCostOfEquity(fin, market);
+  const terminal = assumptions.terminalGrowthRate;
   const growthRate = Math.min(
     Math.max(growthRatePercent / 100, -0.1),
     Math.min(0.25, discountRate - 0.02),
@@ -952,14 +992,15 @@ export function estimateFairValue(
 export function getDcfAssumptions(
   fin: FinancialSnapshot,
   growthRatePercent: number | null,
+  market: Market = "india",
 ): DcfAssumptions {
-  const { discountRate } = computeCostOfEquity(fin);
+  const { discountRate } = computeCostOfEquity(fin, market);
   if (growthRatePercent == null || !Number.isFinite(growthRatePercent)) {
-    return buildDcfAssumptions(fin, null);
+    return buildDcfAssumptions(fin, null, market);
   }
   const growthRate = Math.min(
     Math.max(growthRatePercent / 100, -0.1),
     Math.min(0.25, discountRate - 0.02),
   );
-  return buildDcfAssumptions(fin, growthRate);
+  return buildDcfAssumptions(fin, growthRate, market);
 }

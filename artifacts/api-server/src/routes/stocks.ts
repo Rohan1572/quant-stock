@@ -18,6 +18,7 @@ import {
   getHistory,
   TickerNotFoundError,
 } from "../lib/quant/engine";
+import { marketFromValue } from "../lib/quant/market";
 
 const router: IRouter = Router();
 
@@ -28,7 +29,7 @@ router.get("/stocks/search", async (req, res): Promise<void> => {
     return;
   }
 
-  const results = await searchTickers(parsed.data.q);
+  const results = await searchTickers(parsed.data.q, parsed.data.market);
   res.json(SearchStocksResponse.parse(results));
 });
 
@@ -39,7 +40,13 @@ router.get("/stocks/:ticker", async (req, res): Promise<void> => {
     return;
   }
 
-  const profile = await getProfile(params.data.ticker);
+  const market = marketFromValue(req.get("X-Market"));
+  if (!market) {
+    res.status(400).json({ error: "market must be 'india' or 'us'" });
+    return;
+  }
+
+  const profile = await getProfile(params.data.ticker, market);
   if (!profile) {
     res.status(404).json({ error: `Ticker not found: ${params.data.ticker}` });
     return;
@@ -61,7 +68,12 @@ router.get("/stocks/:ticker/score", async (req, res): Promise<void> => {
   }
 
   try {
-    const score = await getScore(params.data.ticker);
+    const market = marketFromValue(req.get("X-Market"));
+    if (!market) {
+      res.status(400).json({ error: "market must be 'india' or 'us'" });
+      return;
+    }
+    const score = await getScore(params.data.ticker, market);
     res.json(
       GetStockScoreSummaryResponse.parse({
         ticker: score.ticker,
@@ -98,7 +110,12 @@ router.get("/stocks/:ticker/score/details", async (req, res): Promise<void> => {
   }
 
   try {
-    const score = await getScore(params.data.ticker);
+    const market = marketFromValue(req.get("X-Market"));
+    if (!market) {
+      res.status(400).json({ error: "market must be 'india' or 'us'" });
+      return;
+    }
+    const score = await getScore(params.data.ticker, market);
     res.json(
       GetStockScoreDetailsResponse.parse({
         ticker: score.ticker,
@@ -138,7 +155,16 @@ router.get(
       return;
     }
 
-    const points = await getHistory(params.data.ticker, params.data.range);
+    const market = marketFromValue(req.get("X-Market"));
+    if (!market) {
+      res.status(400).json({ error: "market must be 'india' or 'us'" });
+      return;
+    }
+    const points = await getHistory(
+      params.data.ticker,
+      params.data.range,
+      market,
+    );
     if (points.length === 0) {
       res
         .status(404)

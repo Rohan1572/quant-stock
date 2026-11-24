@@ -5,6 +5,7 @@ import {
   raw,
   type YahooSearchQuote,
 } from "./yahooClient";
+import { defaultCurrency, type Market } from "./market";
 
 export interface StockSearchResult {
   ticker: string;
@@ -79,32 +80,43 @@ export interface DataProvider {
   ): Promise<PricePoint[]>;
 }
 
-function exchangeFromTicker(ticker: string): string {
+function exchangeFromTicker(
+  ticker: string,
+  exchange?: string,
+  exchangeDisplay?: string,
+): string {
   if (ticker.endsWith(".NS")) return "NSE";
   if (ticker.endsWith(".BO")) return "BSE";
-  return "NSE";
+  const value = `${exchange ?? ""} ${exchangeDisplay ?? ""}`.toUpperCase();
+  if (value.includes("NASDAQ") || /\b(NMS|NGM|NCM)\b/.test(value)) {
+    return "NASDAQ";
+  }
+  if (value.includes("NYSE AMERICAN") || /\bASE\b/.test(value)) {
+    return "AMEX";
+  }
+  if (value.includes("NYSE") || /\bNYQ\b/.test(value)) return "NYSE";
+  return exchangeDisplay ?? exchange ?? "US";
 }
 
 function mapSearchQuote(q: YahooSearchQuote): StockSearchResult {
   return {
     ticker: q.symbol,
     companyName: q.longname ?? q.shortname ?? q.symbol,
-    exchange: exchangeFromTicker(q.symbol),
+    exchange: exchangeFromTicker(q.symbol, q.exchange, q.exchDisp),
   };
 }
 
 export class YahooFinanceAdapter implements DataProvider {
+  constructor(private readonly market: Market = "india") {}
+
   async search(query: string): Promise<StockSearchResult[]> {
     const quotes = await yahooSearch(query);
-    // Prefer NSE/BSE listings (India-only scope for v1).
-    return quotes
-      .filter((q) => q.symbol.endsWith(".NS") || q.symbol.endsWith(".BO"))
-      .map(mapSearchQuote);
+    return quotes.filter((quote) => this.isInMarket(quote)).map(mapSearchQuote);
   }
 
   async getProfile(ticker: string): Promise<StockProfile | null> {
     const summary = await yahooQuoteSummary(ticker);
-    return summary ? mapProfile(ticker, summary) : null;
+    return summary ? mapProfile(ticker, summary, this.market) : null;
   }
 
   async getFinancialSnapshot(
@@ -124,7 +136,7 @@ export class YahooFinanceAdapter implements DataProvider {
     }
 
     return {
-      profile: mapProfile(ticker, summary),
+      profile: mapProfile(ticker, summary, this.market),
       financialSnapshot: mapFinancialSnapshot(summary),
     };
   }
@@ -135,11 +147,22 @@ export class YahooFinanceAdapter implements DataProvider {
   ): Promise<PricePoint[]> {
     return yahooChart(ticker, range);
   }
+
+  private isInMarket(quote: YahooSearchQuote): boolean {
+    if (this.market === "india") {
+      return quote.symbol.endsWith(".NS") || quote.symbol.endsWith(".BO");
+    }
+
+    return ["NASDAQ", "NYSE", "AMEX"].includes(
+      exchangeFromTicker(quote.symbol, quote.exchange, quote.exchDisp),
+    );
+  }
 }
 
 function mapProfile(
   ticker: string,
   summary: NonNullable<Awaited<ReturnType<typeof yahooQuoteSummary>>>,
+  market: Market,
 ): StockProfile {
   const price = summary.price ?? {};
   const assetProfile = summary.assetProfile ?? {};
@@ -151,7 +174,7 @@ function mapProfile(
     sector: (assetProfile["sector"] as string) ?? null,
     industry: (assetProfile["industry"] as string) ?? null,
     marketCap: raw(price["marketCap"]),
-    currency: (price["currency"] as string) ?? "INR",
+    currency: (price["currency"] as string) ?? defaultCurrency(market),
     price: raw(price["regularMarketPrice"]),
     changePercent: raw(price["regularMarketChangePercent"]),
   };

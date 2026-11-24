@@ -1,6 +1,9 @@
 # Quant Stock
 
-Quant Stock is a full-stack stock scoring workspace with a React frontend, a Vite-based mockup sandbox, and an Express API server.
+Quant Stock is a full-stack stock scoring workspace with India and US market
+modes, a React frontend, a Vite-based mockup sandbox, and an Express API server.
+India is the default market; both modes currently use Yahoo Finance's
+unofficial, best-effort data endpoints.
 
 ## Prerequisites
 
@@ -199,6 +202,10 @@ The score is a weighted blend of six categories, each scored against sector
 benchmarks. Read `docs/scoring-model.md` before changing it — it covers the
 invariants that are easy to break, and the caveats in the upstream data feed
 that have already caused wrong results.
+
+The market selector switches between Indian NSE/BSE stocks and a curated US
+large-cap watchlist. Scores are screened estimates, not investment advice;
+Yahoo Finance is unofficial and has no service-level guarantee.
 
 ## Troubleshooting
 

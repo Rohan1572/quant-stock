@@ -8,7 +8,11 @@ import {
 import { singleFlight } from "../src/lib/quant/singleFlight";
 import { TransientProviderError } from "../src/lib/quant/providerErrors";
 import { logger } from "../src/lib/logger";
-import type { DataProvider, StockProfile } from "../src/lib/quant/provider";
+import {
+  YahooFinanceAdapter,
+  type DataProvider,
+  type StockProfile,
+} from "../src/lib/quant/provider";
 import { yahooChart, yahooQuoteSummary } from "../src/lib/quant/yahooClient";
 
 const TEST_PROFILE: StockProfile = {
@@ -239,6 +243,64 @@ describe("Yahoo chart request coalescing", () => {
       const rawCloseFallback = await yahooChart("TEST.NS", "1y");
       assert.equal(chartRequests, 2);
       assert.equal(rawCloseFallback[0].close, 42);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("market-specific Yahoo search", () => {
+  it("limits search results to the selected market", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () =>
+      Response.json({
+        quotes: [
+          {
+            symbol: "AAPL",
+            shortname: "Apple Inc.",
+            exchange: "NMS",
+            exchDisp: "NasdaqGS",
+            quoteType: "EQUITY",
+          },
+          {
+            symbol: "IBM",
+            shortname: "IBM",
+            exchange: "NYQ",
+            exchDisp: "NYSE",
+            quoteType: "EQUITY",
+          },
+          {
+            symbol: "RELIANCE.NS",
+            shortname: "Reliance Industries",
+            exchange: "NSI",
+            exchDisp: "NSE",
+            quoteType: "EQUITY",
+          },
+          {
+            symbol: "BTC-USD",
+            shortname: "Bitcoin USD",
+            exchange: "CCC",
+            exchDisp: "CCC",
+            quoteType: "CRYPTOCURRENCY",
+          },
+        ],
+      });
+
+    try {
+      const india = await new YahooFinanceAdapter("india").search("apple");
+      const us = await new YahooFinanceAdapter("us").search("apple");
+
+      assert.deepEqual(
+        india.map(({ ticker, exchange }) => [ticker, exchange]),
+        [["RELIANCE.NS", "NSE"]],
+      );
+      assert.deepEqual(
+        us.map(({ ticker, exchange }) => [ticker, exchange]),
+        [
+          ["AAPL", "NASDAQ"],
+          ["IBM", "NYSE"],
+        ],
+      );
     } finally {
       globalThis.fetch = originalFetch;
     }

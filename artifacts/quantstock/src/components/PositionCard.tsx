@@ -14,38 +14,49 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useHolding } from "@/hooks/useHolding";
 import { getPositionAdvice } from "@/lib/positionAdvice";
+import { formatCurrency } from "@/lib/formatCurrency";
+import type { Market } from "@/contexts/MarketContext";
 
 interface Props {
   readonly ticker: string;
   readonly currentPrice: number;
   readonly currency?: string;
   readonly score: number;
+  readonly market?: Market;
 }
 
-const currencySymbol = (c?: string) => (c === "INR" || !c ? "₹" : c + " ");
-
-export function PositionCard({ ticker, currentPrice, currency, score }: Props) {
-  const { holding, saveHolding, clearHolding } = useHolding(ticker);
+export function PositionCard({
+  ticker,
+  currentPrice,
+  currency = "INR",
+  score,
+  market = "india",
+}: Props) {
+  const { holding, saveHolding, clearHolding } = useHolding(ticker, market);
   const [editing, setEditing] = useState(!holding);
   const [qty, setQty] = useState(holding?.quantity?.toString() ?? "");
   const [avgCost, setAvgCost] = useState(holding?.avgCost?.toString() ?? "");
   const [errors, setErrors] = useState<{ qty?: string; avgCost?: string }>({});
 
-  const sym = currencySymbol(currency);
+  const locale = currency === "INR" ? "en-IN" : "en-US";
 
   function validate() {
     const e: typeof errors = {};
-    const q = parseFloat(qty);
-    const c = parseFloat(avgCost);
-    if (!qty || isNaN(q) || q <= 0) e.qty = "Enter a valid quantity";
-    if (!avgCost || isNaN(c) || c <= 0) e.avgCost = "Enter a valid price";
+    const q = Number.parseFloat(qty);
+    const c = Number.parseFloat(avgCost);
+    if (!qty || Number.isNaN(q) || q <= 0) e.qty = "Enter a valid quantity";
+    if (!avgCost || Number.isNaN(c) || c <= 0)
+      e.avgCost = "Enter a valid price";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
   function handleSave() {
     if (!validate()) return;
-    saveHolding({ quantity: parseFloat(qty), avgCost: parseFloat(avgCost) });
+    saveHolding({
+      quantity: Number.parseFloat(qty),
+      avgCost: Number.parseFloat(avgCost),
+    });
     setEditing(false);
   }
 
@@ -99,13 +110,13 @@ export function PositionCard({ ticker, currentPrice, currency, score }: Props) {
               )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="avgCost">Average buy price ({sym})</Label>
+              <Label htmlFor="avgCost">Average buy price ({currency})</Label>
               <Input
                 id="avgCost"
                 type="number"
                 min="0"
                 step="any"
-                placeholder={`e.g. ${sym}1100`}
+                placeholder={currency === "INR" ? "e.g. ₹1100" : "e.g. $110"}
                 value={avgCost}
                 onChange={(e) => setAvgCost(e.target.value)}
                 className={errors.avgCost ? "border-destructive" : ""}
@@ -188,15 +199,11 @@ export function PositionCard({ ticker, currentPrice, currency, score }: Props) {
       <CardContent className="space-y-4">
         {/* Position stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Stat label="Shares" value={quantity.toLocaleString("en-IN")} mono />
-          <Stat
-            label="Avg Cost"
-            value={`${sym}${cost.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`}
-            mono
-          />
+          <Stat label="Shares" value={quantity.toLocaleString(locale)} mono />
+          <Stat label="Avg Cost" value={formatCurrency(cost, currency)} mono />
           <Stat
             label="Current Value"
-            value={`${sym}${currentValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
+            value={formatCurrency(currentValue, currency, 0)}
             mono
           />
           <div className="p-3 rounded-lg bg-secondary/40 border">
@@ -209,10 +216,7 @@ export function PositionCard({ ticker, currentPrice, currency, score }: Props) {
               }`}
             >
               {pnlAbs >= 0 ? "+" : ""}
-              {sym}
-              {Math.abs(pnlAbs).toLocaleString("en-IN", {
-                maximumFractionDigits: 0,
-              })}
+              {formatCurrency(Math.abs(pnlAbs), currency, 0)}
             </div>
             <div
               className={`text-xs font-mono mt-0.5 ${

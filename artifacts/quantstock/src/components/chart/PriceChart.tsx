@@ -10,14 +10,23 @@ import {
 import { format, parseISO } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGetStockPriceHistory } from "@workspace/api-client-react";
+import { useMarket } from "@/contexts/MarketContext";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface ChartProps {
   readonly ticker: string;
   readonly range: "1m" | "6m" | "1y" | "5y";
+  readonly currency: string;
 }
 
-export function PriceChart({ ticker, range }: ChartProps) {
-  const { data, isLoading, isError } = useGetStockPriceHistory(ticker, range);
+export function PriceChart({ ticker, range, currency }: ChartProps) {
+  const { market } = useMarket();
+  const { data, isLoading, isError } = useGetStockPriceHistory(ticker, range, {
+    query: {
+      queryKey: ["/api/stocks", ticker, "history", range, market],
+    },
+    request: { headers: { "X-Market": market } },
+  });
 
   if (isLoading) {
     return (
@@ -28,7 +37,8 @@ export function PriceChart({ ticker, range }: ChartProps) {
     );
   }
 
-  if (isError || !data || data.points.length === 0) {
+  const lastPoint = data?.points.at(-1);
+  if (isError || !data || !lastPoint) {
     return (
       <div className="w-full h-full min-h-[300px] flex items-center justify-center bg-muted/20 border border-dashed rounded-xl">
         <span className="text-muted-foreground text-sm">
@@ -40,7 +50,7 @@ export function PriceChart({ ticker, range }: ChartProps) {
 
   // Determine if overall trend is positive or negative for coloring
   const firstPrice = data.points[0].close;
-  const lastPrice = data.points[data.points.length - 1].close;
+  const lastPrice = lastPoint.close;
   const isPositive = lastPrice >= firstPrice;
   const strokeColor = isPositive ? "hsl(var(--buy))" : "hsl(var(--sell))";
   const fillColor = isPositive ? "url(#colorBuy)" : "url(#colorSell)";
@@ -57,7 +67,7 @@ export function PriceChart({ ticker, range }: ChartProps) {
   };
 
   const formatYAxis = (tickItem: number) => {
-    return `₹${tickItem.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+    return formatCurrency(tickItem, currency, 0);
   };
 
   const minPrice = Math.min(...data.points.map((p) => p.close));
@@ -125,7 +135,7 @@ export function PriceChart({ ticker, range }: ChartProps) {
               marginBottom: "0.25rem",
             }}
             formatter={(value: number) => [
-              `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+              formatCurrency(value, currency),
               "Price",
             ]}
             labelFormatter={(label) =>

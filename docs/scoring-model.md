@@ -64,6 +64,19 @@ point-in-time peer and return data.
 - Obvious duplicate signals have lower relative weights. Those weights remain
   heuristic until evaluated on point-in-time data.
 
+## Market-specific assumptions
+
+The market selector keeps Indian and US stocks in separate watchlists and score
+caches. Sector benchmarks and DCF assumptions are also selected by market.
+Both benchmark tables are static indicative values, not live peer medians; the
+US table is a rough initial baseline and has not been validated against
+point-in-time US peer data.
+
+The DCF uses fixed approximate country assumptions: the existing India values
+remain unchanged, while US scoring uses a 4.2% risk-free rate, 5% equity risk
+premium, no country premium, and 2.5% terminal growth. These assumptions need
+periodic review and should not be read as current market yields.
+
 ## Caveats in the data feed
 
 **Yahoo betas are unreliable for Indian NSE names.** Measured live:

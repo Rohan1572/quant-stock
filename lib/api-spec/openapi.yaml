@@ -3,7 +3,7 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: QuantStock API — NSE/BSE stock scoring engine
+  description: QuantStock API — India and US stock scoring engine
 servers:
   - url: /api
     description: Base API path
@@ -36,6 +36,8 @@ paths:
       operationId: listRankings
       tags: [rankings]
       summary: Get pre-computed top-stock rankings
+      parameters:
+        - $ref: "#/components/parameters/MarketParam"
       responses:
         "200":
           description: Ranked list sorted by overall score descending
@@ -49,6 +51,8 @@ paths:
       operationId: refreshRankings
       tags: [rankings]
       summary: Trigger a background rescore of all watchlist tickers
+      parameters:
+        - $ref: "#/components/parameters/MarketParam"
       responses:
         "200":
           description: Refresh status
@@ -61,8 +65,9 @@ paths:
     get:
       operationId: searchStocks
       tags: [stocks]
-      summary: Search for NSE/BSE tickers by name or symbol
+      summary: Search for stocks in the selected market by name or symbol
       parameters:
+        - $ref: "#/components/parameters/MarketParam"
         - name: q
           in: query
           required: true
@@ -86,6 +91,7 @@ paths:
       summary: Get stock profile
       parameters:
         - $ref: "#/components/parameters/TickerParam"
+        - $ref: "#/components/parameters/MarketHeaderParam"
       responses:
         "200":
           description: Stock profile
@@ -107,6 +113,7 @@ paths:
       summary: Get the cached/current score summary for a ticker
       parameters:
         - $ref: "#/components/parameters/TickerParam"
+        - $ref: "#/components/parameters/MarketHeaderParam"
       responses:
         "200":
           description: Score summary
@@ -128,6 +135,7 @@ paths:
       summary: Get full category breakdown, raw metrics, and formulas for a ticker's score
       parameters:
         - $ref: "#/components/parameters/TickerParam"
+        - $ref: "#/components/parameters/MarketHeaderParam"
       responses:
         "200":
           description: Score details
@@ -149,6 +157,7 @@ paths:
       summary: Get price history for charting
       parameters:
         - $ref: "#/components/parameters/TickerParam"
+        - $ref: "#/components/parameters/MarketHeaderParam"
         - name: range
           in: path
           required: true
@@ -209,11 +218,29 @@ paths:
 
 components:
   parameters:
+    MarketParam:
+      name: market
+      in: query
+      required: false
+      description: Market context; defaults to India for compatibility
+      schema:
+        type: string
+        enum: [india, us]
+        default: india
+    MarketHeaderParam:
+      name: X-Market
+      in: header
+      required: false
+      description: Market context; defaults to India for compatibility
+      schema:
+        type: string
+        enum: [india, us]
+        default: india
     TickerParam:
       name: ticker
       in: path
       required: true
-      description: NSE/BSE ticker, e.g. RELIANCE.NS or 500325.BO
+      description: Market ticker, e.g. RELIANCE.NS, 500325.BO, or AAPL
       schema:
         type: string
 

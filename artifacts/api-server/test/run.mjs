@@ -19,6 +19,7 @@ async function main() {
     "scoring.test",
     "data-fetching.test",
     "score-cache-policy.test",
+    "market.test",
   ];
   const testFiles = testNames.map((name) => join(outDir, `${name}.mjs`));
 

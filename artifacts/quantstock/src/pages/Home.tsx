@@ -1,30 +1,47 @@
 import { Link } from "wouter";
 import { Activity, TrendingUp } from "lucide-react";
 import { SearchCombobox } from "@/components/search/SearchCombobox";
+import { MarketToggle } from "@/components/layout/MarketToggle";
+import { useMarket } from "@/contexts/MarketContext";
 
-const TRENDING_TICKERS = [
+const INDIA_TRENDING_TICKERS = [
   { symbol: "RELIANCE.NS", name: "Reliance Industries" },
   { symbol: "TCS.NS", name: "Tata Consultancy Services" },
   { symbol: "HDFCBANK.NS", name: "HDFC Bank" },
   { symbol: "INFY.NS", name: "Infosys" },
 ];
 
+const US_TRENDING_TICKERS = [
+  { symbol: "AAPL", name: "Apple" },
+  { symbol: "MSFT", name: "Microsoft" },
+  { symbol: "NVDA", name: "NVIDIA" },
+  { symbol: "AMZN", name: "Amazon" },
+];
+
 export default function Home() {
+  const { market } = useMarket();
+  const trendingTickers =
+    market === "india" ? INDIA_TRENDING_TICKERS : US_TRENDING_TICKERS;
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-12 w-full max-w-5xl mx-auto min-h-[calc(100vh-8rem)]">
       <div className="text-center mb-10 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 text-primary mb-6 ring-1 ring-primary/20">
           <Activity className="w-8 h-8" />
         </div>
+        <div className="mb-5">
+          <MarketToggle />
+        </div>
         <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4 text-foreground">
           Precision scoring for <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-600">
-            Indian equities.
+            {market === "india" ? "Indian equities." : "US equities."}
           </span>
         </h1>
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-          No black-box AI. Just pure, transparent quantitative models computing
-          fair value, risk, and momentum on NSE & BSE.
+          Transparent quantitative models computing fair value, risk, and
+          momentum for{" "}
+          {market === "india" ? "NSE & BSE" : "NASDAQ, NYSE & AMEX"} stocks.
         </p>
       </div>
 
@@ -38,10 +55,10 @@ export default function Home() {
           <span>Trending Tickers</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {TRENDING_TICKERS.map((ticker) => (
+          {trendingTickers.map((ticker) => (
             <Link
               key={ticker.symbol}
-              href={`/stocks/${ticker.symbol}`}
+              href={`/stocks/${ticker.symbol}?market=${market}`}
               className="flex flex-col p-3 rounded-lg border bg-card hover:bg-secondary hover:border-primary/50 transition-all text-left"
               data-testid={`trending-${ticker.symbol}`}
             >

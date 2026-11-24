@@ -1,6 +1,7 @@
-// Indicative NSE/BSE sector benchmark medians (spec §3.1/§3.3). Static
-// reference values, not live peer medians — sector-relative percentile ranking
-// is deferred to v2 (spec §7).
+import type { Market } from "./market";
+
+// Static indicative sector references, not live peer medians. US baselines
+// are preliminary and have not been calibrated against historical constituents.
 //
 // Scoring also needs each metric's *dispersion*: a raw gap to the median means
 // nothing without knowing how spread out sector peers are.
@@ -165,6 +166,154 @@ const SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
   },
 };
 
+const US_DEFAULT_BENCHMARK: SectorBenchmark = {
+  peRatio: 25,
+  pbRatio: 4.5,
+  evEbitda: 16,
+  pegRatio: 1.8,
+  roe: 15,
+  roa: 6,
+  grossMargin: 40,
+  operatingMargin: 15,
+  netMargin: 10,
+  debtToEquity: 0.8,
+};
+
+const US_SECTOR_BENCHMARKS: Record<string, SectorBenchmark> = {
+  Technology: {
+    peRatio: 30,
+    pbRatio: 8,
+    evEbitda: 20,
+    pegRatio: 1.8,
+    roe: 25,
+    roa: 12,
+    grossMargin: 60,
+    operatingMargin: 25,
+    netMargin: 18,
+    debtToEquity: 0.5,
+  },
+  "Financial Services": {
+    peRatio: 15,
+    pbRatio: 1.8,
+    evEbitda: 12,
+    pegRatio: 1.5,
+    roe: 12,
+    roa: 1.2,
+    grossMargin: 65,
+    operatingMargin: 30,
+    netMargin: 18,
+    debtToEquity: 2.5,
+  },
+  Energy: {
+    peRatio: 14,
+    pbRatio: 1.8,
+    evEbitda: 7,
+    pegRatio: 1.5,
+    roe: 12,
+    roa: 6,
+    grossMargin: 35,
+    operatingMargin: 15,
+    netMargin: 9,
+    debtToEquity: 0.8,
+  },
+  "Consumer Defensive": {
+    peRatio: 24,
+    pbRatio: 6,
+    evEbitda: 16,
+    pegRatio: 2,
+    roe: 24,
+    roa: 10,
+    grossMargin: 38,
+    operatingMargin: 15,
+    netMargin: 10,
+    debtToEquity: 1,
+  },
+  "Consumer Cyclical": {
+    peRatio: 25,
+    pbRatio: 5,
+    evEbitda: 15,
+    pegRatio: 1.8,
+    roe: 16,
+    roa: 7,
+    grossMargin: 35,
+    operatingMargin: 12,
+    netMargin: 8,
+    debtToEquity: 0.8,
+  },
+  Healthcare: {
+    peRatio: 25,
+    pbRatio: 5,
+    evEbitda: 16,
+    pegRatio: 1.8,
+    roe: 16,
+    roa: 9,
+    grossMargin: 55,
+    operatingMargin: 18,
+    netMargin: 13,
+    debtToEquity: 0.7,
+  },
+  "Basic Materials": {
+    peRatio: 17,
+    pbRatio: 2.5,
+    evEbitda: 9,
+    pegRatio: 1.6,
+    roe: 12,
+    roa: 6,
+    grossMargin: 28,
+    operatingMargin: 14,
+    netMargin: 8,
+    debtToEquity: 0.7,
+  },
+  Industrials: {
+    peRatio: 22,
+    pbRatio: 4,
+    evEbitda: 14,
+    pegRatio: 1.8,
+    roe: 16,
+    roa: 7,
+    grossMargin: 30,
+    operatingMargin: 13,
+    netMargin: 9,
+    debtToEquity: 0.9,
+  },
+  Utilities: {
+    peRatio: 18,
+    pbRatio: 2,
+    evEbitda: 10,
+    pegRatio: 2,
+    roe: 10,
+    roa: 3,
+    grossMargin: 45,
+    operatingMargin: 20,
+    netMargin: 10,
+    debtToEquity: 1.5,
+  },
+  "Communication Services": {
+    peRatio: 22,
+    pbRatio: 4,
+    evEbitda: 12,
+    pegRatio: 1.7,
+    roe: 12,
+    roa: 5,
+    grossMargin: 50,
+    operatingMargin: 20,
+    netMargin: 12,
+    debtToEquity: 0.9,
+  },
+  "Real Estate": {
+    peRatio: 35,
+    pbRatio: 2.5,
+    evEbitda: 20,
+    pegRatio: 2,
+    roe: 8,
+    roa: 3,
+    grossMargin: 45,
+    operatingMargin: 25,
+    netMargin: 15,
+    debtToEquity: 1.2,
+  },
+};
+
 /**
  * One standard deviation per metric, used to turn the gap to a sector median
  * into a z-score. Deliberately generous: understating sigma makes ordinary
@@ -209,10 +358,25 @@ const NORMALISED_BENCHMARKS: Map<string, SectorBenchmark> = new Map(
   ]),
 );
 
-export function getSectorBenchmark(sector: string | null): SectorBenchmark {
-  if (!sector) return DEFAULT_BENCHMARK;
+const NORMALISED_US_BENCHMARKS: Map<string, SectorBenchmark> = new Map(
+  Object.entries(US_SECTOR_BENCHMARKS).map(([key, value]) => [
+    normaliseSector(key),
+    value,
+  ]),
+);
+
+export function getSectorBenchmark(
+  sector: string | null,
+  market: Market = "india",
+): SectorBenchmark {
+  if (!sector) {
+    return market === "us" ? US_DEFAULT_BENCHMARK : DEFAULT_BENCHMARK;
+  }
+  const benchmarks =
+    market === "us" ? NORMALISED_US_BENCHMARKS : NORMALISED_BENCHMARKS;
   return (
-    NORMALISED_BENCHMARKS.get(normaliseSector(sector)) ?? DEFAULT_BENCHMARK
+    benchmarks.get(normaliseSector(sector)) ??
+    (market === "us" ? US_DEFAULT_BENCHMARK : DEFAULT_BENCHMARK)
   );
 }
 
@@ -220,7 +384,12 @@ export function getSectorBenchmark(sector: string | null): SectorBenchmark {
  * Whether a real sector benchmark was found, as opposed to the fallback —
  * scored against the wrong reference distribution deserves lower confidence.
  */
-export function hasSectorBenchmark(sector: string | null): boolean {
+export function hasSectorBenchmark(
+  sector: string | null,
+  market: Market = "india",
+): boolean {
   if (!sector) return false;
-  return NORMALISED_BENCHMARKS.has(normaliseSector(sector));
+  const benchmarks =
+    market === "us" ? NORMALISED_US_BENCHMARKS : NORMALISED_BENCHMARKS;
+  return benchmarks.has(normaliseSector(sector));
 }

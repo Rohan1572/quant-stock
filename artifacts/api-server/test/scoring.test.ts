@@ -143,6 +143,25 @@ describe("scoring configuration and labels", () => {
     );
   });
 
+  describe("market-specific scoring assumptions", () => {
+    it("uses separate sector benchmarks and DCF assumptions for US stocks", () => {
+      const indiaBenchmark = getSectorBenchmark("Technology", "india");
+      const usBenchmark = getSectorBenchmark("Technology", "us");
+      const indiaDcf = getDcfAssumptions(snapshot(), null, "india");
+      const usDcf = getDcfAssumptions(snapshot(), null, "us");
+
+      assert.notEqual(usBenchmark.peRatio, indiaBenchmark.peRatio);
+      assert.equal(
+        computeConfidence(snapshot(), [], [], "Technology", "us").breakdown
+          .benchmarkQuality,
+        0.55,
+      );
+      assert.equal(indiaDcf.riskFreeRate, 0.065);
+      assert.equal(usDcf.riskFreeRate, 0.042);
+      assert.equal(usDcf.terminalGrowthRate, 0.025);
+    });
+  });
+
   it("normalizes persisted action-oriented labels to screening ratings", () => {
     assert.equal(normalizeRecommendation("strong_buy"), "very_positive");
     assert.equal(normalizeRecommendation("strong_short"), "extremely_negative");

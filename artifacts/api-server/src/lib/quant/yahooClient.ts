@@ -138,6 +138,7 @@ export interface YahooSearchQuote {
   symbol: string;
   shortname?: string;
   longname?: string;
+  exchange?: string;
   exchDisp?: string;
   quoteType?: string;
 }

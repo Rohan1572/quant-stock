@@ -4,10 +4,13 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
 import { SearchCombobox } from "@/components/search/SearchCombobox";
+import { MarketToggle } from "@/components/layout/MarketToggle";
+import { useMarket } from "@/contexts/MarketContext";
 
 export function Shell({ children }: { readonly children: React.ReactNode }) {
   const [location] = useLocation();
   const { theme, toggle } = useTheme();
+  const { market } = useMarket();
   const showHeaderSearch = location !== "/";
 
   return (
@@ -32,6 +35,7 @@ export function Shell({ children }: { readonly children: React.ReactNode }) {
             </div>
 
             <nav className="flex items-center space-x-1">
+              <MarketToggle compact />
               <Button
                 variant="ghost"
                 size="icon"
@@ -55,7 +59,9 @@ export function Shell({ children }: { readonly children: React.ReactNode }) {
                 )}
               >
                 <Trophy className="w-4 h-4" />
-                <span className="hidden sm:inline">Top 100</span>
+                <span className="hidden sm:inline">
+                  {market === "india" ? "Top 100" : "Top US"}
+                </span>
               </Link>
               <Link
                 href="/scoring-config"
@@ -84,8 +90,11 @@ export function Shell({ children }: { readonly children: React.ReactNode }) {
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <span>v0.1.0</span>
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-buy animate-pulse"></span>
-              API Connected
+              <span
+                className="w-2 h-2 rounded-full bg-buy animate-pulse"
+                aria-hidden="true"
+              />
+              <span>API Connected</span>
             </span>
           </div>
         </div>

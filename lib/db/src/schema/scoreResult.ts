@@ -17,6 +17,7 @@ export const scoreResultsTable = pgTable(
   "score_results",
   {
     id: serial("id").primaryKey(),
+    market: text("market").notNull().default("india"),
     ticker: text("ticker").notNull(),
     computedAt: timestamp("computed_at", { withTimezone: true })
       .notNull()
@@ -42,7 +43,12 @@ export const scoreResultsTable = pgTable(
     explanation: jsonb("explanation").notNull(),
     dcfAssumptions: jsonb("dcf_assumptions").notNull(),
   },
-  (table) => [uniqueIndex("score_results_ticker_idx").on(table.ticker)],
+  (table) => [
+    uniqueIndex("score_results_market_ticker_idx").on(
+      table.market,
+      table.ticker,
+    ),
+  ],
 );
 
 export const insertScoreResultSchema = createInsertSchema(

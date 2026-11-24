@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { Route, Switch, Router as WouterRouter } from "wouter";
 import { Shell } from "@/components/layout/Shell";
+import { MarketProvider } from "@/contexts/MarketContext";
 
 import Home from "@/pages/Home";
 import StockScore from "@/pages/StockScore";
@@ -37,12 +38,14 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
+      <MarketProvider>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </MarketProvider>
     </QueryClientProvider>
   );
 }

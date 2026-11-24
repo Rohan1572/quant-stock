@@ -1,7 +1,8 @@
 import { db, scoreResultsTable, scoringConfigsTable } from "@workspace/db";
-import { eq, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { logger } from "../logger";
 import { YahooFinanceAdapter, type DataProvider } from "./provider";
+import { defaultCurrency, type Market } from "./market";
 import { fetchScoringInputs } from "./scoringInputs";
 import { singleFlight } from "./singleFlight";
 import { resolveScoreCache } from "./scoreCachePolicy";
@@ -25,7 +26,10 @@ import { buildExplanation, buildTopFactors, buildRiskFlags } from "./explain";
 
 export { TickerNotFoundError } from "./scoringInputs";
 
-const provider: DataProvider = new YahooFinanceAdapter();
+const providers: Record<Market, DataProvider> = {
+  india: new YahooFinanceAdapter("india"),
+  us: new YahooFinanceAdapter("us"),
+};
 
 const DEFAULT_WEIGHTS: CategoryWeights = {
   valuationWeight: 0.25,
@@ -104,23 +108,27 @@ export interface ComputedScore {
   computedAt: Date;
 }
 
-async function computeFreshScore(ticker: string): Promise<ComputedScore> {
+async function computeFreshScore(
+  ticker: string,
+  market: Market,
+): Promise<ComputedScore> {
   const {
     profile,
     financialSnapshot: fin,
     priceHistory,
-  } = await fetchScoringInputs(provider, ticker);
+  } = await fetchScoringInputs(providers[market], ticker);
   const snapshot = fin ?? EMPTY_SNAPSHOT;
 
   const weights = await getWeightsForSector(profile.sector);
   const { categories, categoryScores, overallScore, scoreRange, coverage } =
-    computeCategories(profile, snapshot, weights, priceHistory);
+    computeCategories(profile, snapshot, weights, priceHistory, market);
 
   const { score: confidence, breakdown } = computeConfidence(
     snapshot,
     priceHistory,
     categories,
     profile.sector,
+    market,
   );
 
   // Shrink before mapping to a recommendation, so a high score on thin
@@ -131,6 +139,7 @@ async function computeFreshScore(ticker: string): Promise<ComputedScore> {
     snapshot,
     snapshot.revenueGrowth,
     profile.sector,
+    market,
   );
   const explanation = buildExplanation(
     profile,
@@ -161,7 +170,7 @@ async function computeFreshScore(ticker: string): Promise<ComputedScore> {
     topFactors,
     riskFlags,
     explanation,
-    dcfAssumptions: getDcfAssumptions(snapshot, snapshot.revenueGrowth),
+    dcfAssumptions: getDcfAssumptions(snapshot, snapshot.revenueGrowth, market),
     computedAt: new Date(),
   };
 }
@@ -197,16 +206,29 @@ const EMPTY_SNAPSHOT = {
   netIncome: null,
 };
 
-export function getScore(ticker: string): Promise<ComputedScore> {
+export function getScore(
+  ticker: string,
+  market: Market = "india",
+): Promise<ComputedScore> {
   const normalized = ticker.toUpperCase();
-  return singleFlight(scoreRequests, normalized, () => loadScore(normalized));
+  return singleFlight(scoreRequests, `${market}:${normalized}`, () =>
+    loadScore(normalized, market),
+  );
 }
 
-async function loadScore(normalized: string): Promise<ComputedScore> {
+async function loadScore(
+  normalized: string,
+  market: Market,
+): Promise<ComputedScore> {
   const [cached] = await db
     .select()
     .from(scoreResultsTable)
-    .where(eq(scoreResultsTable.ticker, normalized))
+    .where(
+      and(
+        eq(scoreResultsTable.market, market),
+        eq(scoreResultsTable.ticker, normalized),
+      ),
+    )
     .limit(1);
 
   return resolveScoreCache({
@@ -219,7 +241,7 @@ async function loadScore(normalized: string): Promise<ComputedScore> {
       : null,
     now: Date.now(),
     ttlMs: SCORE_CACHE_TTL_MS,
-    compute: () => computeFreshScore(normalized),
+    compute: () => computeFreshScore(normalized, market),
     mapCached: rowToComputedScore,
     onStale: (err) => {
       logger.warn(
@@ -232,6 +254,7 @@ async function loadScore(normalized: string): Promise<ComputedScore> {
         .insert(scoreResultsTable)
         .values({
           ticker: normalized,
+          market,
           computedAt: fresh.computedAt,
           overallScore: fresh.overallScore,
           recommendation: fresh.recommendation,
@@ -250,7 +273,7 @@ async function loadScore(normalized: string): Promise<ComputedScore> {
           dcfAssumptions: fresh.dcfAssumptions,
         })
         .onConflictDoUpdate({
-          target: scoreResultsTable.ticker,
+          target: [scoreResultsTable.market, scoreResultsTable.ticker],
           set: {
             computedAt: fresh.computedAt,
             overallScore: fresh.overallScore,
@@ -276,6 +299,7 @@ async function loadScore(normalized: string): Promise<ComputedScore> {
 
 function rowToComputedScore(row: {
   ticker: string;
+  market: string;
   overallScore: number;
   recommendation: string;
   confidence: number;
@@ -309,7 +333,7 @@ function rowToComputedScore(row: {
           sector: null,
           industry: null,
           marketCap: null,
-          currency: "INR",
+          currency: row.market === "us" ? defaultCurrency("us") : "INR",
           price: null,
           changePercent: null,
         },
@@ -400,17 +424,18 @@ const EMPTY_BREAKDOWN: ConfidenceBreakdown = {
   historyQuality: 0,
 };
 
-export async function getProfile(ticker: string) {
-  return provider.getProfile(ticker.toUpperCase());
+export async function getProfile(ticker: string, market: Market = "india") {
+  return providers[market].getProfile(ticker.toUpperCase());
 }
 
-export async function searchTickers(query: string) {
-  return provider.search(query);
+export async function searchTickers(query: string, market: Market = "india") {
+  return providers[market].search(query);
 }
 
 export async function getHistory(
   ticker: string,
   range: "1m" | "6m" | "1y" | "5y",
+  market: Market = "india",
 ) {
-  return provider.getPriceHistory(ticker.toUpperCase(), range);
+  return providers[market].getPriceHistory(ticker.toUpperCase(), range);
 }

@@ -7,6 +7,14 @@ import {
 } from "@workspace/api-client-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useMarket } from "@/contexts/MarketContext";
+
+function getSearchPlaceholder(compact: boolean, market: "india" | "us") {
+  if (compact) return "Search tickers…";
+  if (market === "india")
+    return "Search Indian stocks (e.g. RELIANCE, TCS, INFY)";
+  return "Search US stocks (e.g. AAPL, MSFT, NVDA)";
+}
 
 export function SearchCombobox({
   className,
@@ -18,6 +26,7 @@ export function SearchCombobox({
   readonly compact?: boolean;
 }) {
   const [, setLocation] = useLocation();
+  const { market } = useMarket();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -33,11 +42,11 @@ export function SearchCombobox({
 
   // Fetch search results
   const { data: results, isLoading } = useSearchStocks(
-    { q: debouncedQuery },
+    { q: debouncedQuery, market },
     {
       query: {
         enabled: debouncedQuery.length > 0,
-        queryKey: getSearchStocksQueryKey({ q: debouncedQuery }),
+        queryKey: getSearchStocksQueryKey({ q: debouncedQuery, market }),
       },
     },
   );
@@ -58,7 +67,9 @@ export function SearchCombobox({
 
   const handleSelect = (ticker: string) => {
     setIsOpen(false);
-    setLocation(`/stocks/${encodeURIComponent(ticker.toUpperCase())}`);
+    setLocation(
+      `/stocks/${encodeURIComponent(ticker.toUpperCase())}?market=${market}`,
+    );
   };
 
   const onSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
@@ -93,11 +104,7 @@ export function SearchCombobox({
               setIsOpen(true);
             }}
             onFocus={() => setIsOpen(true)}
-            placeholder={
-              compact
-                ? "Search tickers…"
-                : "Search tickers (e.g. RELIANCE, TCS, INFY)"
-            }
+            placeholder={getSearchPlaceholder(compact, market)}
             autoFocus={autoFocus}
             className={cn(
               "bg-card border-input focus-visible:border-primary font-mono uppercase",

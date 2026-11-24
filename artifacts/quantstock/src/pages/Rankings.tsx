@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useMarket } from "@/contexts/MarketContext";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -54,6 +55,11 @@ function scoreTextColor(score: number) {
   if (score >= 70) return "text-buy";
   if (score <= 40) return "text-sell";
   return "text-hold";
+}
+
+function getExchangeLabel(ticker: string, market: "india" | "us"): string {
+  if (market === "us") return "US";
+  return ticker.endsWith(".BO") ? "BSE" : "NSE";
 }
 
 function formatRelativeTime(iso: string | null | undefined): string {
@@ -128,12 +134,14 @@ function refreshButtonLabel(
 }
 
 export default function Rankings() {
+  const { market } = useMarket();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSector, setActiveSector] = useState<string | null>(null);
 
-  const { data, isLoading, refetch } = useListRankings({
+  const rankingsParams = { market };
+  const { data, isLoading, refetch } = useListRankings(rankingsParams, {
     query: {
-      queryKey: getListRankingsQueryKey(),
+      queryKey: getListRankingsQueryKey(rankingsParams),
       staleTime: 0,
       refetchInterval: (q) => (q.state.data?.isRefreshing ? 5_000 : false),
     },
@@ -142,16 +150,27 @@ export default function Rankings() {
     useRefreshRankings();
 
   const [cooldownMsg, setCooldownMsg] = useState<string | null>(null);
-  const [autoTriggered, setAutoTriggered] = useState(false);
+  const [autoTriggeredMarket, setAutoTriggeredMarket] = useState<
+    typeof market | null
+  >(null);
 
   // Auto-start scoring on first load if no full refresh has ever completed
   useEffect(() => {
-    if (isLoading || autoTriggered) return;
+    if (isLoading || autoTriggeredMarket === market) return;
     if (!data?.lastRefreshedAt && !data?.isRefreshing) {
-      setAutoTriggered(true);
-      triggerRefresh(undefined, { onSuccess: () => refetch() });
+      setAutoTriggeredMarket(market);
+      triggerRefresh(
+        { params: rankingsParams },
+        { onSuccess: () => refetch() },
+      );
     }
-  }, [isLoading, data?.lastRefreshedAt, data?.isRefreshing]);
+  }, [
+    isLoading,
+    market,
+    autoTriggeredMarket,
+    data?.lastRefreshedAt,
+    data?.isRefreshing,
+  ]);
 
   // Clear cooldown message once nextRefreshAt passes
   useEffect(() => {
@@ -173,23 +192,26 @@ export default function Rankings() {
   const canRefresh = !isRefreshing && !isTriggering && !cooldownMsg;
 
   function handleRefresh() {
-    triggerRefresh(undefined, {
-      onSuccess(result) {
-        if (result.status === "rate_limited") {
-          const next = result.nextRefreshAt
-            ? formatNextRefresh(result.nextRefreshAt)
-            : "soon";
-          setCooldownMsg(`Available ${next}`);
-          void refetch();
-        } else {
-          void refetch();
-        }
+    triggerRefresh(
+      { params: rankingsParams },
+      {
+        onSuccess(result) {
+          if (result.status === "rate_limited") {
+            const next = result.nextRefreshAt
+              ? formatNextRefresh(result.nextRefreshAt)
+              : "soon";
+            setCooldownMsg(`Available ${next}`);
+            void refetch();
+          } else {
+            void refetch();
+          }
+        },
       },
-    });
+    );
   }
 
   const allItems = data?.items ?? [];
-  const total = data?.total ?? 100;
+  const total = data?.total ?? (market === "india" ? 100 : 25);
   const scored = data?.scored ?? 0;
   const progressPct = total > 0 ? Math.round((scored / total) * 100) : 0;
 
@@ -213,12 +235,15 @@ export default function Rankings() {
             <div className="flex items-center gap-2 mb-1">
               <Trophy className="w-6 h-6 text-primary" />
               <h1 className="text-3xl font-extrabold tracking-tight">
-                Top Stocks
+                {market === "india" ? "Top Indian Stocks" : "Top US Stocks"}
               </h1>
             </div>
             <p className="text-muted-foreground text-sm max-w-lg">
-              {total} NSE large/mid-cap stocks ranked by the QuantStock
-              algorithm — valuation, profitability, growth, risk, and momentum.
+              {market === "india"
+                ? `${total} NSE/BSE large and mid-cap stocks`
+                : `${total} curated US large-cap stocks`}{" "}
+              ranked by the QuantStock algorithm — valuation, profitability,
+              growth, risk, and momentum.
             </p>
           </div>
 
@@ -375,7 +400,7 @@ export default function Rankings() {
                 return (
                   <Link
                     key={item.ticker}
-                    href={`/stocks/${encodeURIComponent(item.ticker)}`}
+                    href={`/stocks/${encodeURIComponent(item.ticker)}?market=${market}`}
                   >
                     <div className="grid grid-cols-[3rem_1fr_auto] sm:grid-cols-[3rem_1fr_8rem_10rem_7rem] gap-2 px-4 py-3 border-b last:border-0 items-center hover:bg-secondary/40 transition-colors cursor-pointer group">
                       {/* Rank */}
@@ -405,7 +430,7 @@ export default function Rankings() {
                             variant="outline"
                             className="text-[10px] px-1.5 py-0 hidden sm:inline-flex shrink-0"
                           >
-                            {item.ticker.endsWith(".BO") ? "BSE" : "NSE"}
+                            {getExchangeLabel(item.ticker, market)}
                           </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground truncate">

@@ -1,14 +1,15 @@
 import { Router, type IRouter } from "express";
-import { inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db, scoreResultsTable } from "@workspace/db";
 import {
   ListRankingsResponse,
   RefreshRankingsResponse,
 } from "@workspace/api-zod";
-import { WATCHLIST, getWatchlistEntry } from "../lib/quant/nifty100";
 import { getScore, TickerNotFoundError } from "../lib/quant/engine";
 import { normalizeRecommendation } from "../lib/quant/scoring";
 import { logger } from "../lib/logger";
+import { marketFromValue, type Market } from "../lib/quant/market";
+import { getMarketWatchlistEntry, getWatchlist } from "../lib/quant/watchlists";
 
 const router: IRouter = Router();
 
@@ -18,32 +19,46 @@ const PARTIAL_REFRESH_RETRY_DELAY_MS = 5 * 60 * 1000; // 5 minutes
 const SCORE_BATCH_SIZE = 5;
 const SCORE_BATCH_DELAY_MS = 300; // ms between batches — be gentle with Yahoo
 
-let lastRefreshAt: Date | null = null;
-let retryAvailableAt: Date | null = null;
-let isRefreshing = false;
-
-function nextRefreshAt(): Date | null {
-  if (retryAvailableAt) return retryAvailableAt;
-  if (!lastRefreshAt) return null;
-  return new Date(lastRefreshAt.getTime() + REFRESH_COOLDOWN_MS);
+interface RefreshState {
+  lastRefreshAt: Date | null;
+  retryAvailableAt: Date | null;
+  isRefreshing: boolean;
 }
 
-function canRefresh(): boolean {
-  if (isRefreshing) return false;
-  if (retryAvailableAt) return Date.now() >= retryAvailableAt.getTime();
-  if (!lastRefreshAt) return true;
-  return Date.now() - lastRefreshAt.getTime() >= REFRESH_COOLDOWN_MS;
+const refreshStates: Record<Market, RefreshState> = {
+  india: { lastRefreshAt: null, retryAvailableAt: null, isRefreshing: false },
+  us: { lastRefreshAt: null, retryAvailableAt: null, isRefreshing: false },
+};
+
+function nextRefreshAt(state: RefreshState): Date | null {
+  if (state.retryAvailableAt) return state.retryAvailableAt;
+  if (!state.lastRefreshAt) return null;
+  return new Date(state.lastRefreshAt.getTime() + REFRESH_COOLDOWN_MS);
+}
+
+function canRefresh(state: RefreshState): boolean {
+  if (state.isRefreshing) return false;
+  if (state.retryAvailableAt) {
+    return Date.now() >= state.retryAvailableAt.getTime();
+  }
+  if (!state.lastRefreshAt) return true;
+  return Date.now() - state.lastRefreshAt.getTime() >= REFRESH_COOLDOWN_MS;
 }
 
 // ── Background scoring job ────────────────────────────────────────────────
-async function scoreAllInBackground(): Promise<void> {
-  isRefreshing = true;
+async function scoreAllInBackground(market: Market): Promise<void> {
+  const state = refreshStates[market];
+  const watchlist = getWatchlist(market);
+  state.isRefreshing = true;
   try {
-    logger.info({ tickers: WATCHLIST.length }, "Rankings refresh started");
+    logger.info(
+      { market, tickers: watchlist.length },
+      "Rankings refresh started",
+    );
     let succeeded = 0;
     let failed = 0;
 
-    const tickers = WATCHLIST.map((e) => e.ticker);
+    const tickers = watchlist.map((e) => e.ticker);
     const batches = Array.from(
       { length: Math.ceil(tickers.length / SCORE_BATCH_SIZE) },
       (_, index) =>
@@ -55,7 +70,7 @@ async function scoreAllInBackground(): Promise<void> {
           await Promise.all(
             batch.map(async (ticker) => {
               try {
-                await getScore(ticker);
+                await getScore(ticker, market);
                 succeeded++;
               } catch (err) {
                 if (err instanceof TickerNotFoundError) {
@@ -80,31 +95,50 @@ async function scoreAllInBackground(): Promise<void> {
     );
 
     if (failed === 0) {
-      lastRefreshAt = new Date();
-      retryAvailableAt = null;
-      logger.info({ succeeded, failed }, "Rankings refresh complete");
+      state.lastRefreshAt = new Date();
+      state.retryAvailableAt = null;
+      logger.info({ market, succeeded, failed }, "Rankings refresh complete");
     } else {
-      retryAvailableAt = new Date(Date.now() + PARTIAL_REFRESH_RETRY_DELAY_MS);
+      state.retryAvailableAt = new Date(
+        Date.now() + PARTIAL_REFRESH_RETRY_DELAY_MS,
+      );
       logger.warn(
-        { succeeded, failed, retryAvailableAt },
+        {
+          market,
+          succeeded,
+          failed,
+          retryAvailableAt: state.retryAvailableAt,
+        },
         "Rankings refresh partially complete; failed tickers can be retried",
       );
     }
   } finally {
-    isRefreshing = false;
+    state.isRefreshing = false;
   }
 }
 
 // ── Routes ────────────────────────────────────────────────────────────────
-router.get("/rankings", async (_req, res): Promise<void> => {
-  const allTickers = WATCHLIST.map((e) => e.ticker);
+router.get("/rankings", async (req, res): Promise<void> => {
+  const market = marketFromValue(req.query.market);
+  if (!market) {
+    res.status(400).json({ error: "market must be 'india' or 'us'" });
+    return;
+  }
+  const state = refreshStates[market];
+  const watchlist = getWatchlist(market);
+  const allTickers = watchlist.map((e) => e.ticker);
 
   const rows =
     allTickers.length > 0
       ? await db
           .select()
           .from(scoreResultsTable)
-          .where(inArray(scoreResultsTable.ticker, allTickers))
+          .where(
+            and(
+              eq(scoreResultsTable.market, market),
+              inArray(scoreResultsTable.ticker, allTickers),
+            ),
+          )
       : [];
 
   // Rank on the confidence-adjusted score: ranking on the raw score favours
@@ -122,7 +156,7 @@ router.get("/rankings", async (_req, res): Promise<void> => {
       return a.ticker.localeCompare(b.ticker);
     })
     .map((row, idx) => {
-      const meta = getWatchlistEntry(row.ticker);
+      const meta = getMarketWatchlistEntry(market, row.ticker);
       return {
         rank: idx + 1,
         ticker: row.ticker,
@@ -147,22 +181,29 @@ router.get("/rankings", async (_req, res): Promise<void> => {
   res.json(
     ListRankingsResponse.parse({
       items: sorted,
-      total: WATCHLIST.length,
+      total: watchlist.length,
       scored: rows.length,
-      isRefreshing,
-      lastRefreshedAt: lastRefreshAt?.toISOString() ?? null,
-      nextRefreshAt: nextRefreshAt()?.toISOString() ?? null,
+      isRefreshing: state.isRefreshing,
+      lastRefreshedAt: state.lastRefreshAt?.toISOString() ?? null,
+      nextRefreshAt: nextRefreshAt(state)?.toISOString() ?? null,
     }),
   );
 });
 
-router.post("/rankings/refresh", (_req, res): void => {
-  if (!canRefresh()) {
-    const next = nextRefreshAt();
+router.post("/rankings/refresh", (req, res): void => {
+  const market = marketFromValue(req.query.market);
+  if (!market) {
+    res.status(400).json({ error: "market must be 'india' or 'us'" });
+    return;
+  }
+  const state = refreshStates[market];
+  const watchlist = getWatchlist(market);
+  if (!canRefresh(state)) {
+    const next = nextRefreshAt(state);
     res.json(
       RefreshRankingsResponse.parse({
         status: "rate_limited",
-        message: isRefreshing
+        message: state.isRefreshing
           ? "A refresh is already in progress."
           : `Rankings were refreshed recently. Next refresh available at ${next?.toISOString()}.`,
         nextRefreshAt: next?.toISOString() ?? null,
@@ -172,14 +213,14 @@ router.post("/rankings/refresh", (_req, res): void => {
   }
 
   // Fire and forget — response returns immediately
-  scoreAllInBackground().catch((err) =>
-    logger.error({ err }, "Rankings background refresh crashed"),
+  scoreAllInBackground(market).catch((err) =>
+    logger.error({ err, market }, "Rankings background refresh crashed"),
   );
 
   res.json(
     RefreshRankingsResponse.parse({
       status: "started",
-      message: `Scoring ${WATCHLIST.length} tickers in the background. Check back in a few minutes.`,
+      message: `Scoring ${watchlist.length} ${market.toUpperCase()} tickers in the background. Check back in a few minutes.`,
       nextRefreshAt: null,
     }),
   );

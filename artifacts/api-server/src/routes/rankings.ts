@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, scoreResultsTable } from "@workspace/db";
 import {
   ListRankingsResponse,
@@ -58,7 +58,56 @@ async function scoreAllInBackground(market: Market): Promise<void> {
     let succeeded = 0;
     let failed = 0;
 
-    const tickers = watchlist.map((e) => e.ticker);
+    // Build scoring order: top-25 from the previous ranking first (what users
+    // look at), then the remaining watchlist tickers stale-first (oldest
+    // computedAt first) so nothing rots, then any never-scored tickers last.
+    const watchlistTickers = watchlist.map((e) => e.ticker);
+
+    const previousRanking = watchlistTickers.length
+      ? await db
+          .select({ ticker: scoreResultsTable.ticker })
+          .from(scoreResultsTable)
+          .where(
+            and(
+              eq(scoreResultsTable.market, market),
+              inArray(scoreResultsTable.ticker, watchlistTickers),
+            ),
+          )
+          .orderBy(
+            sql`${scoreResultsTable.adjustedScore} DESC NULLS LAST`,
+            sql`${scoreResultsTable.confidence} DESC NULLS LAST`,
+            scoreResultsTable.ticker,
+          )
+          .limit(25)
+      : [];
+
+    const topTickers = previousRanking.map((r) => r.ticker);
+
+    const remainingTickers = watchlistTickers.filter(
+      (t) => !topTickers.includes(t),
+    );
+
+    const staleTickers = remainingTickers.length
+      ? (
+          await db
+            .select({ ticker: scoreResultsTable.ticker })
+            .from(scoreResultsTable)
+            .where(
+              and(
+                eq(scoreResultsTable.market, market),
+                inArray(scoreResultsTable.ticker, remainingTickers),
+              ),
+            )
+            .orderBy(sql`${scoreResultsTable.computedAt} ASC NULLS FIRST`)
+        ).map((r) => r.ticker)
+      : [];
+
+    const neverScored = remainingTickers.filter(
+      (t) => !staleTickers.includes(t),
+    );
+
+    const tickers = [...topTickers, ...staleTickers, ...neverScored];
+
     const batches = Array.from(
       { length: Math.ceil(tickers.length / SCORE_BATCH_SIZE) },
       (_, index) =>

@@ -365,11 +365,12 @@ export default function Rankings() {
           </CardHeader>
 
           {/* Column headers */}
-          <div className="hidden sm:grid grid-cols-[3rem_1fr_8rem_10rem_7rem] gap-2 px-4 py-2 border-b bg-secondary/30 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <div className="hidden sm:grid grid-cols-[3rem_1fr_7rem_9rem_6rem_4rem] gap-2 px-4 py-2 border-b bg-secondary/30 text-xs font-bold uppercase tracking-wider text-muted-foreground">
             <span className="text-center">#</span>
             <span>Stock</span>
             <span className="text-center">Rating</span>
             <span>Score</span>
+            <span>Scored</span>
             <span />
           </div>
 
@@ -402,7 +403,7 @@ export default function Rankings() {
                     key={item.ticker}
                     href={`/stocks/${encodeURIComponent(item.ticker)}?market=${market}`}
                   >
-                    <div className="grid grid-cols-[3rem_1fr_auto] sm:grid-cols-[3rem_1fr_8rem_10rem_7rem] gap-2 px-4 py-3 border-b last:border-0 items-center hover:bg-secondary/40 transition-colors cursor-pointer group">
+                    <div className="grid grid-cols-[3rem_1fr_auto] sm:grid-cols-[3rem_1fr_7rem_9rem_6rem_4rem] gap-2 px-4 py-3 border-b last:border-0 items-center hover:bg-secondary/40 transition-colors cursor-pointer group">
                       {/* Rank */}
                       <div
                         className={`text-center font-mono font-bold text-sm ${
@@ -501,6 +502,10 @@ export default function Rankings() {
                         </div>
                       </div>
 
+                      {/* Scored — per-stock freshness, no DevTools needed */}
+                      <div className="hidden sm:block text-center text-xs text-muted-foreground font-mono w-full shrink-0">
+                        {formatRelativeTime(item.computedAt)}
+                      </div>
                       {/* Arrow */}
                       <div className="hidden sm:flex justify-end">
                         <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
